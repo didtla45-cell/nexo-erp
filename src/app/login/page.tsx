@@ -35,7 +35,7 @@ export default function LoginPage() {
       
       window.location.href = "/dashboard";
     } catch (err: any) {
-      setError(err.message === "Invalid login credentials" ? "이메일 또는 비밀번호가 올바르지 않습니다." : err.message);
+      setError(err.message === "Invalid login credentials" ? "이메일 또는 비밀번호가 올바르지 않습니다." : `로그인 실패: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -48,7 +48,7 @@ export default function LoginPage() {
         <div className="max-w-md w-full space-y-10">
           <div className="space-y-2">
             <p className="text-xs font-black text-indigo-600 uppercase tracking-[0.2em]">Welcome Back</p>
-            <h1 className="text-4xl font-black text-slate-900 tracking-tighter italic">NEXO Login</h1>
+            <h1 className="text-4xl font-black text-slate-900 tracking-tighter italic">NEXO Login <span className="text-xs text-indigo-500 not-italic font-sans font-bold">(Jimin v1.1)</span></h1>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-6">
