@@ -679,7 +679,7 @@ function SetBudgetModal({ companyId, departments, onClose, onSuccess }: any) {
       company_id: companyId,
       department_id: formData.department_id,
       total_budget: Number(formData.total_budget.replace(/,/g, "")),
-      month: new Date().toISOString().split('T')[0] // Always set for current month
+      year_month: new Date().toISOString().slice(0, 7) // Always set for current month ('2026-03')
     });
     if (!error) onSuccess();
     else alert(error.message);
