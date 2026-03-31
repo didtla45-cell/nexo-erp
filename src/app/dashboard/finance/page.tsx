@@ -51,6 +51,8 @@ export default function FinancePage() {
   const [departments, setDepartments] = useState<any[]>([]);
   const [showReport, setShowReport] = useState(false);
   const [isCardModalOpen, setIsCardModalOpen] = useState(false);
+  const [isEditCardModalOpen, setIsEditCardModalOpen] = useState(false); // Added for editing
+  const [selectedCard, setSelectedCard] = useState<any>(null); // Added for editing
   const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
   const [companyId, setCompanyId] = useState<string | null>(null);
 
@@ -234,7 +236,11 @@ export default function FinancePage() {
                 </div>
               ) : (
                 corporateCards.map((card) => (
-                  <div key={card.id} className="p-6 bg-slate-50/50 rounded-[32px] border border-slate-100 hover:border-indigo-200 transition-all group overflow-hidden relative">
+                  <div 
+                    key={card.id} 
+                    onClick={() => { setSelectedCard(card); setIsEditCardModalOpen(true); }}
+                    className="p-6 bg-slate-50/50 rounded-[32px] border border-slate-100 hover:border-indigo-400 hover:bg-white hover:shadow-2xl hover:shadow-indigo-100/50 transition-all group overflow-hidden relative cursor-pointer"
+                  >
                     <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-indigo-500/5 rounded-full blur-2xl group-hover:scale-150 transition-transform"></div>
                     <div className="flex justify-between items-start mb-6">
                       <div className="space-y-1">
@@ -362,6 +368,13 @@ export default function FinancePage() {
             companyId={companyId} 
             onClose={() => setIsCardModalOpen(false)} 
             onSuccess={() => { setIsCardModalOpen(false); fetchData(); }} 
+          />
+        )}
+        {isEditCardModalOpen && selectedCard && (
+          <EditCardModal 
+            card={selectedCard}
+            onClose={() => setIsEditCardModalOpen(false)} 
+            onSuccess={() => { setIsEditCardModalOpen(false); fetchData(); }} 
           />
         )}
         {isBudgetModalOpen && (
@@ -658,6 +671,91 @@ function AddCardModal({ companyId, onClose, onSuccess }: any) {
           <button type="submit" disabled={loading} className="w-full py-5 bg-slate-900 text-white font-black rounded-3xl mt-4 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-slate-200 uppercase tracking-widest">
             {loading ? "등록 중..." : "카드 무사히 등록하기 🔐"}
           </button>
+        </form>
+      </motion.div>
+    </div>
+  );
+}
+
+function EditCardModal({ card, onClose, onSuccess }: any) {
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    bank_name: card.bank_name,
+    card_number: card.card_number,
+    card_holder_name: card.card_holder_name,
+    monthly_limit: Number(card.monthly_limit).toLocaleString()
+  });
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    const { error } = await supabase
+      .from("erp_corporate_cards")
+      .update({
+        bank_name: formData.bank_name,
+        card_number: formData.card_number,
+        card_holder_name: formData.card_holder_name,
+        monthly_limit: Number(formData.monthly_limit.replace(/,/g, "")),
+      })
+      .eq("id", card.id);
+
+    if (!error) onSuccess();
+    else alert(error.message);
+    setLoading(false);
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm("정말로 이 카드를 삭제하시겠습니까? 관련 데이터가 모두 삭제됩니다.")) return;
+    setLoading(true);
+    const { error } = await supabase
+      .from("erp_corporate_cards")
+      .delete()
+      .eq("id", card.id);
+
+    if (!error) onSuccess();
+    else alert(error.message);
+    setLoading(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 bg-slate-900/60 backdrop-blur-md" />
+      <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-lg bg-white rounded-[44px] p-10 z-10 border border-slate-100 shadow-3xl">
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-3">
+              <CardIcon className="text-indigo-600" /> 카드 정보 수정
+            </h2>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1 italic">Update Card Details</p>
+          </div>
+          <button onClick={onClose} className="p-2 text-slate-300 hover:text-slate-500 transition-colors"><X size={24} /></button>
+        </div>
+        
+        <form onSubmit={handleUpdate} className="space-y-6">
+          <div className="space-y-2">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Bank & Holder</p>
+            <div className="grid grid-cols-2 gap-4">
+              <input required type="text" placeholder="은행명" className="w-full px-6 py-4 bg-slate-50 rounded-2xl outline-none font-bold" value={formData.bank_name} onChange={(e) => setFormData({...formData, bank_name: e.target.value})} />
+              <input required type="text" placeholder="소유주명" className="w-full px-6 py-4 bg-slate-50 rounded-2xl outline-none font-bold" value={formData.card_holder_name} onChange={(e) => setFormData({...formData, card_holder_name: e.target.value})} />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Card Credentials</p>
+            <input required type="text" placeholder="카드번호" className="w-full px-6 py-4 bg-slate-50 rounded-2xl outline-none font-bold" value={formData.card_number} onChange={(e) => setFormData({...formData, card_number: e.target.value})} />
+          </div>
+          <div className="space-y-2">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Monthly Spending Limit</p>
+            <input required type="text" placeholder="월 한도" className="w-full px-6 py-4 bg-slate-50 rounded-2xl outline-none font-bold text-right text-indigo-600 text-lg" value={formData.monthly_limit} onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ""); setFormData({...formData, monthly_limit: val.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}); }} />
+          </div>
+          
+          <div className="grid grid-cols-5 gap-3 pt-4">
+            <button type="submit" disabled={loading} className="col-span-3 py-5 bg-slate-900 text-white font-black rounded-3xl hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-slate-200 uppercase tracking-widest">
+              {loading ? "저장 중..." : "정보 수정하기 ✨"}
+            </button>
+            <button type="button" onClick={handleDelete} disabled={loading} className="col-span-2 py-5 bg-rose-50 text-rose-600 font-black rounded-3xl hover:bg-rose-100 transition-all uppercase tracking-widest">
+              삭제
+            </button>
+          </div>
         </form>
       </motion.div>
     </div>
