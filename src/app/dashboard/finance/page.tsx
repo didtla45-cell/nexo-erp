@@ -673,16 +673,32 @@ function SetBudgetModal({ companyId, departments, onClose, onSuccess }: any) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!companyId || !formData.department_id) return;
+    if (!companyId || !formData.department_id) {
+       alert("회사 ID 또는 부서 정보가 누락되었습니다. 다시 시도해 주세요.");
+       return;
+    }
     setLoading(true);
-    const { error } = await supabase.from("erp_budgets").upsert({
+
+    const budgetData = {
       company_id: companyId,
       department_id: formData.department_id,
       total_budget: Number(formData.total_budget.replace(/,/g, "")),
-      year_month: new Date().toISOString().slice(0, 7) // Always set for current month ('2026-03')
-    });
-    if (!error) onSuccess();
-    else alert(error.message);
+      year_month: new Date().toISOString().slice(0, 7) // '2026-03'
+    };
+
+    console.log("Saving budget data:", budgetData);
+
+    const { data, error } = await supabase
+      .from("erp_budgets")
+      .upsert(budgetData, { onConflict: 'department_id, year_month' });
+
+    if (!error) {
+      console.log("Budget saved successfully:", data);
+      onSuccess();
+    } else {
+      console.error("Budget save error:", error);
+      alert(`예산 저장 실패: ${error.message}\n(Code: ${error.code})`);
+    }
     setLoading(false);
   };
 
