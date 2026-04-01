@@ -20,7 +20,8 @@ import {
   ArrowDownRight,
   Plus,
   Settings,
-  X
+  X,
+  ChevronLeft
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase";
@@ -55,8 +56,11 @@ export default function FinancePage() {
   const [selectedCard, setSelectedCard] = useState<any>(null); // Added for editing
   const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
   const [companyId, setCompanyId] = useState<string | null>(null);
+  const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
+  const [selectedMonth, setSelectedMonth] = useState("2026-03"); // Default to March to match user's current view
 
-  const fetchData = async () => {
+  const fetchData = async (monthOverride?: string) => {
+    const month = monthOverride || selectedMonth;
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     
@@ -116,11 +120,37 @@ export default function FinancePage() {
             *,
             department:erp_departments(name)
           `)
-          .eq("company_id", profile.company_id);
+          .eq("company_id", profile.company_id)
+          .eq("year_month", month);
         if (budgetData) setBudgets(budgetData);
+
+        // Fetch Recent Transactions
+        const { data: txData } = await supabase
+          .from("erp_corp_cards")
+          .select(`
+            *,
+            department:erp_departments(name)
+          `)
+          .eq("company_id", profile.company_id)
+          .order("transaction_date", { ascending: false })
+          .limit(10);
+        if (txData) setRecentTransactions(txData);
       }
     }
     setLoading(false);
+  };
+
+  const handleMonthChange = (direction: 'prev' | 'next') => {
+    const [year, month] = selectedMonth.split('-').map(Number);
+    let newYear = year;
+    let newMonth = direction === 'next' ? month + 1 : month - 1;
+    
+    if (newMonth > 12) { newYear++; newMonth = 1; }
+    if (newMonth < 1) { newYear--; newMonth = 12; }
+    
+    const newMonthStr = `${newYear}-${String(newMonth).padStart(2, '0')}`;
+    setSelectedMonth(newMonthStr);
+    fetchData(newMonthStr);
   };
 
   useEffect(() => {
@@ -281,7 +311,7 @@ export default function FinancePage() {
             <h3 className="text-xl font-black flex items-center gap-3">
               <PieChart className="text-emerald-400" /> 부서별 예산 현황
             </h3>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               {(userRole === 'owner' || userRole === 'admin') && (
                 <button 
                   onClick={() => setIsBudgetModalOpen(true)}
@@ -290,7 +320,24 @@ export default function FinancePage() {
                   <Plus size={12} /> 예산 설정
                 </button>
               )}
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">March 2026</span>
+              
+              <div className="flex items-center gap-1 bg-indigo-500/20 px-3 py-1.5 rounded-2xl border border-indigo-400/30 shadow-lg shadow-indigo-500/10">
+                <button 
+                   onClick={() => handleMonthChange('prev')}
+                   className="p-1 hover:bg-white/10 rounded-lg text-indigo-200 hover:text-white transition-all"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <span className="text-[10px] font-black text-white uppercase tracking-widest min-w-[85px] text-center px-1">
+                  {new Date(selectedMonth).toLocaleString('ko-KR', { year: 'numeric', month: 'long' })}
+                </span>
+                <button 
+                   onClick={() => handleMonthChange('next')}
+                   className="p-1 hover:bg-white/10 rounded-lg text-indigo-200 hover:text-white transition-all"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -329,6 +376,63 @@ export default function FinancePage() {
               <ArrowUpRight size={14} /> View All Departments
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* New: Recent Card Transactions Section */}
+      <div className="bg-white rounded-[44px] p-10 border border-slate-100 shadow-xl shadow-slate-200/40 space-y-8">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xl font-black text-slate-800 flex items-center gap-3">
+             <CardIcon className="text-indigo-600" /> 실시간 카드 결제 및 부서별 현황
+          </h3>
+          <span className="text-[10px] font-black text-slate-400 bg-slate-50 px-3 py-1 rounded-full uppercase tracking-widest border border-slate-100">Live Transaction Feed</span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-100">
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">일시</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">사용처</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">사용 부서</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">결제 금액</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">진행 상태</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {recentTransactions.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-20 text-center opacity-30 italic font-medium text-slate-400">데이터가 존재하지 않습니다.</td>
+                </tr>
+              ) : (
+                recentTransactions.map((tx) => (
+                  <tr key={tx.id} className="hover:bg-slate-50 transition-all">
+                    <td className="px-6 py-5 text-xs text-slate-500 font-bold">
+                       {new Date(tx.transaction_date).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </td>
+                    <td className="px-6 py-5">
+                       <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-0.5">{tx.category || '기타'}</p>
+                       <p className="text-sm font-black text-slate-800">{tx.vendor}</p>
+                    </td>
+                    <td className="px-6 py-5">
+                       <span className="px-3 py-1 bg-indigo-50 text-indigo-600 text-[10px] font-black rounded-lg border border-indigo-100">
+                         {tx.department?.name?.split('(')[0] || '미지정'}
+                       </span>
+                    </td>
+                    <td className="px-6 py-5 font-black text-slate-800 tracking-tighter">
+                       ₩{Number(tx.amount).toLocaleString()}
+                    </td>
+                    <td className="px-6 py-5">
+                       <div className="flex items-center gap-2 text-[10px] font-black text-emerald-500 uppercase tracking-tighter">
+                          <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
+                          Confirmed
+                       </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
