@@ -57,7 +57,7 @@ export default function FinancePage() {
   const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
-  const [selectedMonth, setSelectedMonth] = useState("2026-03"); // Default to March to match user's current view
+  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)); // Default to current month (e.g., 2026-04)
 
   const fetchData = async (monthOverride?: string) => {
     const month = monthOverride || selectedMonth;
