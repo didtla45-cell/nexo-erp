@@ -46,6 +46,12 @@ type ERPRequest = {
   amount: number;
   status: "pending" | "approved" | "rejected";
   created_at: string;
+  profiles?: {
+    full_name: string;
+    erp_departments?: {
+      name: string;
+    }
+  }
 };
 
 type ERPIncome = {
@@ -116,7 +122,11 @@ export default function AccountingPage() {
     setLoading(true);
     const context = await initializeUserContext();
     if (context?.companyId) {
-      const { data: reqData } = await supabase.from("erp_requests").select("*").eq("company_id", context.companyId).order("created_at", { ascending: false });
+      const { data: reqData } = await supabase
+        .from("erp_requests")
+        .select("*, profiles:erp_profiles(full_name, erp_departments(name))")
+        .eq("company_id", context.companyId)
+        .order("created_at", { ascending: false });
       const { data: incData } = await supabase.from("erp_income").select("*").eq("company_id", context.companyId).order("date", { ascending: false });
       if (reqData) setRequests(reqData);
       if (incData) setIncomeList(incData);
@@ -271,6 +281,7 @@ function ExpenseTable({ data, selectedIds, onToggleSelect, onSelectAll, onSelect
             {isAdmin && <input type="checkbox" checked={pendingIds.length > 0 && pendingIds.every((id: string) => selectedIds.includes(id))} onChange={() => onSelectAll(pendingIds)} className="w-4 h-4 rounded border-slate-300 text-indigo-600" />}
           </th>
           <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">문서 정보</th>
+          <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">기안부서 / 기안자</th>
           <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">분류</th>
           <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">청구 금액</th>
           <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">상태</th>
@@ -282,6 +293,14 @@ function ExpenseTable({ data, selectedIds, onToggleSelect, onSelectAll, onSelect
           <tr key={request.id} className={`hover:bg-slate-50/50 transition-all ${selectedIds.includes(request.id) ? "bg-indigo-50/30" : ""}`}>
             <td className="px-8 py-6">{isAdmin && request.status === "pending" && <input type="checkbox" checked={selectedIds.includes(request.id)} onChange={() => onToggleSelect(request.id)} className="w-4 h-4 rounded border-slate-300 text-indigo-600" />}</td>
             <td className="px-8 py-6"><span onClick={() => onSelect(request)} className="font-black text-slate-800 text-sm hover:text-blue-600 transition-all cursor-pointer">{request.title}</span></td>
+            <td className="px-8 py-6">
+              <div className="flex flex-col">
+                <span className="text-sm font-black text-slate-700 tracking-tight">{request.profiles?.full_name || "익명"}</span>
+                <span className="text-[9px] text-indigo-400 font-bold uppercase tracking-widest mt-1">
+                  {request.profiles?.erp_departments?.name?.split('(')[0] || "미소속"}
+                </span>
+              </div>
+            </td>
             <td className="px-8 py-6">
               <div className="flex items-center gap-2">
                 <span className="px-3 py-1.5 bg-slate-100 text-slate-600 text-[10px] font-black rounded-xl whitespace-nowrap">지출 결의</span>
@@ -431,6 +450,16 @@ function DetailModal({ request, onClose, onUpdateStatus, onDelete, onEdit, isAdm
         <h2 className="text-4xl font-black text-slate-800 tracking-tighter mb-8">{request.title}</h2>
         <div className="p-6 bg-blue-50 border border-blue-100 rounded-[32px] mb-8">
           <p className="text-lg font-black text-blue-600">₩{Number(request.amount).toLocaleString()}</p>
+        </div>
+        
+        <div className="flex items-center gap-6 mb-8 p-6 bg-slate-50 rounded-[32px] border border-slate-100">
+          <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm text-indigo-500">
+             <UserIcon size={24} />
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">기안자 정보</p>
+            <p className="text-sm font-black text-slate-800">{request.profiles?.full_name || "알 수 없음"} <span className="text-indigo-400 ml-2">({request.profiles?.erp_departments?.name?.split('(')[0] || "부서 없음"})</span></p>
+          </div>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
