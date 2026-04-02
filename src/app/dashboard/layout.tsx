@@ -20,7 +20,8 @@ import {
   Clock,
   AlertTriangle,
   Info,
-  Briefcase
+  Briefcase,
+  ShieldCheck
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase";
@@ -49,10 +50,10 @@ export default function DashboardLayout({
       }
 
       if (user) {
-        // 1. Fetch profile
+        // 1. Fetch profile with permissions
         let { data: existingProfile } = await supabase
           .from("erp_profiles")
-          .select("full_name, role, company_id, department_id, erp_departments(name)")
+          .select("full_name, role, company_id, department_id, erp_departments(name, menu_permissions)")
           .eq("id", user.id)
           .single();
 
@@ -136,21 +137,43 @@ export default function DashboardLayout({
             </div>
           </Link>
         </div>
-
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          <SidebarItem icon={<LayoutDashboard size={20} />} label="대시보드" href="/dashboard" />
-          <SidebarItem icon={<FileText size={20} />} label="지출 결재" href="/dashboard/accounting" />
-          <SidebarItem icon={<Calendar size={20} />} label="연차/반차 결재" href="/dashboard/hr" />
-          <SidebarItem icon={<CreditCard size={20} />} label="회계 통계" href="/dashboard/finance" />
-          <SidebarItem icon={<Users size={20} />} label="임직원 관리" href="/dashboard/members" />
-          <SidebarItem icon={<Package size={20} />} label="재고 관리" href="/dashboard/inventory" />
-          <SidebarItem icon={<TrendingUp size={20} />} label="영업 관리" href="/dashboard/sales" />
-          <SidebarItem icon={<FileText size={20} />} label="견적서 관리" href="/dashboard/quotations" />
-          <div className="pt-4 pb-2 px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">
-            시스템
-          </div>
-          <SidebarItem icon={<Settings size={20} />} label="설정" href="/dashboard/settings" />
-          <SidebarItem icon={<Briefcase size={20} />} label="부서/사번 관리" href="/dashboard/settings/departments" />
+          {/* Helper Function Inside Component Scope for easier access to profile */}
+          {(() => {
+            const hasPerm = (key: string) => {
+              if (profile?.role === 'owner' || profile?.role === 'admin') return true;
+              const perms = (profile?.erp_departments as any)?.menu_permissions;
+              return perms ? perms[key] !== false : true; // Default to true if not set
+            };
+
+            return (
+              <>
+                <SidebarItem icon={<LayoutDashboard size={20} />} label="대시보드" href="/dashboard" />
+                
+                {hasPerm('accounting') && <SidebarItem icon={<FileText size={20} />} label="지출 결재" href="/dashboard/accounting" />}
+                {hasPerm('hr') && <SidebarItem icon={<Calendar size={20} />} label="연차/반차 결재" href="/dashboard/hr" />}
+                {hasPerm('finance') && <SidebarItem icon={<CreditCard size={20} />} label="회계 통계" href="/dashboard/finance" />}
+                {hasPerm('members') && <SidebarItem icon={<Users size={20} />} label="임직원 관리" href="/dashboard/members" />}
+                {hasPerm('inventory') && <SidebarItem icon={<Package size={20} />} label="재고 관리" href="/dashboard/inventory" />}
+                {hasPerm('sales') && <SidebarItem icon={<TrendingUp size={20} />} label="영업 관리" href="/dashboard/sales" />}
+                {hasPerm('quotations') && <SidebarItem icon={<FileText size={20} />} label="견적서 관리" href="/dashboard/quotations" />}
+                
+                <div className="pt-4 pb-2 px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  시스템
+                </div>
+                
+                {hasPerm('settings') && (
+                  <>
+                    <SidebarItem icon={<Settings size={20} />} label="설정" href="/dashboard/settings" />
+                    <SidebarItem icon={<Briefcase size={20} />} label="부서/사번 관리" href="/dashboard/settings/departments" />
+                    {(profile?.role === 'owner' || profile?.role === 'admin' || hasPerm('settings')) && (
+                      <SidebarItem icon={<ShieldCheck size={20} />} label="권한 관리" href="/dashboard/settings/permissions" />
+                    )}
+                  </>
+                )}
+              </>
+            );
+          })()}
         </nav>
 
         {/* AI Partner Section */}

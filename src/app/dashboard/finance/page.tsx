@@ -100,8 +100,26 @@ export default function FinancePage() {
           .select("id, amount, title, date, content")
           .eq("company_id", profile.company_id);
 
+        const { data: revData } = await supabase
+          .from("erp_revenue_vouchers")
+          .select("id, total_amount, description, revenue_date")
+          .eq("company_id", profile.company_id);
+
+        let combinedIncome: any[] = [];
+        if (incData) combinedIncome = [...combinedIncome, ...incData];
+        if (revData) {
+          const formattedRev = revData.map(r => ({
+            id: r.id,
+            amount: r.total_amount,
+            title: r.description,
+            date: r.revenue_date,
+            content: "영업 시스템 자동 연동"
+          }));
+          combinedIncome = [...combinedIncome, ...formattedRev];
+        }
+
         if (reqData) setRequests(reqData as any);
-        if (incData) setIncomeList(incData as any);
+        setIncomeList(combinedIncome);
 
         // Fetch Corporate Cards (Only if authorized)
         if (profile.role === 'owner' || profile.role === 'admin' || ["회계팀", "영업팀"].includes((profile as any).erp_departments?.name)) {

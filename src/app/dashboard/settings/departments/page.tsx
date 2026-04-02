@@ -11,7 +11,13 @@ import {
   Copy, 
   CheckCircle2,
   Briefcase,
-  Link2
+  Link2,
+  Settings,
+  FileText,
+  Calendar,
+  CreditCard,
+  Package,
+  TrendingUp
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase";
@@ -165,7 +171,7 @@ export default function DepartmentManagement() {
                       className="p-2 text-indigo-400 hover:text-indigo-600 hover:bg-white rounded-lg transition-all"
                       title="가입 코드 생성"
                     >
-                      <Key size={14} />
+                      <Plus size={14} />
                     </button>
                     <button 
                       onClick={() => deleteDepartment(dept.id)}
@@ -243,9 +249,6 @@ export default function DepartmentManagement() {
                     </td>
                   </tr>
                 ))}
-                {codes.length === 0 && (
-                  <tr><td colSpan={5} className="p-20 text-center text-[10px] font-black text-slate-300 uppercase tracking-widest">부서를 선택하고 가입 코드를 생성해 주세요.</td></tr>
-                )}
               </tbody>
             </table>
           </div>
@@ -254,3 +257,4 @@ export default function DepartmentManagement() {
     </div>
   );
 }
+

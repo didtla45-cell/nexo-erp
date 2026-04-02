@@ -33,29 +33,58 @@ export default function DashboardHome() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       
+      // 0. Fetch profile with role/dept
       const { data: profile } = await supabase
         .from("erp_profiles")
-        .select("company_id")
+        .select("company_id, role, department_id")
         .eq("id", user.id)
         .single();
       
       if (!profile) return;
       const companyId = profile.company_id;
+      const userRole = profile.role;
+      const deptId = profile.department_id;
+      const isAdmin = userRole === 'owner' || userRole === 'admin';
 
-      const { data: expenses } = await supabase
+      // 1. 지출 데이터 (Requests) - 권한 필터 적용
+      let expQuery = supabase
         .from("erp_requests")
-        .select("id, amount, status, title, created_at")
+        .select("id, amount, status, title, created_at, department_id")
         .eq("company_id", companyId);
+      
+      if (!isAdmin && deptId) {
+        expQuery = expQuery.eq("department_id", deptId);
+      }
+
+      const { data: expenses } = await expQuery;
       
       const totalExp = expenses
         ?.filter(e => e.status === 'approved')
         .reduce((sum, e) => sum + e.amount, 0) || 0;
+
+      // 2. 수입 데이터 (Revenue Vouchers) - 권한 필터 적용
+      let revQuery = supabase
+        .from("erp_revenue_vouchers")
+        .select("total_amount, department_id")
+        .eq("company_id", companyId);
+      
+      if (!isAdmin && deptId) {
+        revQuery = revQuery.eq("department_id", deptId);
+      }
+
+      const { data: revVouchers } = await revQuery;
 
       const { data: income } = await supabase
         .from("erp_income")
         .select("amount")
         .eq("company_id", companyId);
 
+      const combinedIncome = [
+        ...(income || []),
+        ...(revVouchers || []).map(r => ({ amount: r.total_amount }))
+      ];
+
+      // 3. 인력 데이터 - 인사는 전체 데이터 유지 (혹은 부서별 필터링 가능)
       const { count: empCount } = await supabase
         .from("erp_profiles")
         .select("*", { count: 'exact', head: true })
@@ -70,10 +99,28 @@ export default function DashboardHome() {
         .lte("start_date", today)
         .gte("end_date", today);
 
+      // 4. 재고 데이터 (부족 품목 체크)
+      const { data: invItems } = await supabase
+        .from("erp_inventory_items")
+        .select("name, current_stock, min_stock_level")
+        .eq("company_id", companyId);
+      
+      const lowStockItems = (invItems || []).filter(item => item.current_stock < (item.min_stock_level || 10));
+
+      // 5. 영업 데이터 (활성 딜 체크)
+      const { data: activeDeals } = await supabase
+        .from("erp_sales_deals")
+        .select("id")
+        .eq("company_id", companyId)
+        .not("stage", "in", '("Won", "Lost")');
+
+      // 6. AI 인사이트 생성 (통합 데이터)
       const insight = generateBusinessInsight({
         expenses: expenses || [],
-        income: income || [],
-        employees: empCount || 0
+        income: combinedIncome,
+        employees: empCount || 0,
+        lowStockItems: lowStockItems,
+        activeDealsCount: activeDeals?.length || 0
       });
 
       setStats({
@@ -190,17 +237,55 @@ export default function DashboardHome() {
            </div>
         </div>
 
-        <div className="bg-gradient-to-br from-indigo-50 to-white p-10 rounded-[44px] border border-indigo-100/50 shadow-xl shadow-indigo-100/30 overflow-hidden relative">
-          <TrendingUp className="absolute top-10 right-10 text-indigo-200" size={80} />
-          <div className="relative z-10">
-            <h3 className="text-xl font-black text-indigo-900 mb-2">AI Business Insight</h3>
-            <p className="text-xs text-indigo-400 font-bold uppercase tracking-widest mb-6">NEXO Intelligence</p>
-            <div className="p-6 bg-white/70 backdrop-blur-md rounded-3xl border border-white shadow-sm italic text-indigo-800/80 font-medium leading-relaxed">
-              "{stats.insight}"
+        <div className="bg-white p-10 rounded-[44px] border border-slate-100 shadow-2xl shadow-indigo-100/40 overflow-hidden relative group">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full -mr-32 -mt-32 blur-3xl group-hover:bg-indigo-500/10 transition-colors duration-700"></div>
+          
+          <div className="relative z-10 flex flex-col h-full">
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-indigo-100 shadow-lg">
+                    <img src="/persona/jimin.png" alt="Jimin" className="w-full h-full object-cover" />
+                  </div>
+                  <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 border-4 border-white rounded-full"></div>
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-slate-800 tracking-tight">지민이의 AI 브리핑</h3>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 text-[9px] font-black uppercase tracking-widest rounded-md border border-indigo-100">Intelligence Engine</span>
+                    <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Active Now</span>
+                  </div>
+                </div>
+              </div>
+              <motion.div animate={{ rotate: [0, 10, -10, 0] }} transition={{ repeat: Infinity, duration: 4 }} className="p-3 bg-indigo-50 rounded-2xl text-indigo-600">
+                <TrendingUp size={24} />
+              </motion.div>
             </div>
-            <button className="mt-8 text-sm font-black text-indigo-600 flex items-center gap-2 hover:gap-3 transition-all">
-               상세 레포트 보기 <ArrowUpRight size={16} />
-            </button>
+
+            <div className="flex-1">
+              <div className="p-8 bg-slate-50/50 backdrop-blur-sm rounded-[32px] border border-slate-100 relative group-hover:bg-white transition-all duration-500">
+                <div className="absolute top-4 right-4 opacity-10">
+                  <Zap size={40} className="text-indigo-600" />
+                </div>
+                <p className="text-slate-700 font-bold leading-relaxed whitespace-pre-wrap text-sm italic">
+                  {stats.insight}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-8 flex items-center justify-between">
+              <div className="flex -space-x-2">
+                {[1, 2, 3].map(i => (
+                  <div key={`avatar-dot-${i}`} className={`w-8 h-8 rounded-full border-2 border-white bg-slate-200 flex items-center justify-center text-[8px] font-black text-slate-400`}>
+                    {i === 1 ? 'FIN' : i === 2 ? 'INV' : 'SAL'}
+                  </div>
+                ))}
+              </div>
+              <button className="px-6 py-3 bg-indigo-600 text-white text-[10px] font-black rounded-xl shadow-xl shadow-indigo-600/20 hover:scale-105 active:scale-95 transition-all uppercase tracking-widest">
+                상세 분석 레포트 보기
+              </button>
+            </div>
           </div>
         </div>
       </div>

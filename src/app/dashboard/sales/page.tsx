@@ -364,27 +364,90 @@ function AddQuotationModal({ companyId, deal, onClose, onSuccess }: { companyId:
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedItems.length === 0) return alert("품목을 추가해 주세요.");
+    
+    // 1. 실시간 재고 체크 (대표님 지시: 부족 시 아예 차단)
+    for (const si of selectedItems) {
+      const currentItem = items.find(i => i.id === si.id);
+      if (!currentItem || currentItem.current_stock < si.quantity) {
+        return alert(`재고가 부족하여 견적서를 발행할 수 없습니다.\n품목: ${si.name}\n현재고: ${currentItem?.current_stock || 0}\n필요량: ${si.quantity}`);
+      }
+    }
+
     setSubmitting(true);
+    const { data: { user } } = await supabase.auth.getUser();
 
     const qNum = `QT-${Date.now().toString().slice(-6)}`;
+    
+    // 2. 견적서 메인 데이터 저장
     const { data: qData, error: qError } = await supabase.from("erp_sales_quotations").insert([{
       company_id: companyId,
       deal_id: deal.id,
       customer_id: (deal as any).customer_id || null,
       quotation_number: qNum,
       total_amount: total,
+      status: 'Sent', // 발행 시 바로 'Sent' 상태로 변경
       valid_until: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     }]).select();
 
     if (qData) {
+      const qId = qData[0].id;
+
+      // 3. 견적 품목 상세 저장
       const itemsToInsert = selectedItems.map(si => ({
-        quotation_id: qData[0].id,
+        quotation_id: qId,
         item_id: si.id,
         quantity: si.quantity,
         unit_price: si.unit_price,
         subtotal: si.subtotal
       }));
       await supabase.from("erp_sales_quotation_items").insert(itemsToInsert);
+
+      // 4. 재고 차감 및 이력 생성
+      for (const si of selectedItems) {
+        const currentItem = items.find(i => i.id === si.id);
+        const newStock = (currentItem?.current_stock || 0) - si.quantity;
+
+        // 재고 수량 업데이트
+        await supabase.from("erp_inventory_items")
+          .update({ current_stock: newStock })
+          .eq("id", si.id);
+
+        // 출고 이력 생성
+        await supabase.from("erp_inventory_transactions").insert([{
+          company_id: companyId,
+          item_id: si.id,
+          user_id: user?.id,
+          type: 'out',
+          quantity: si.quantity,
+          reason: `견적서 발행 자동 차감 (${qNum})`
+        }]);
+      }
+
+      // 5. 매출 전표 자동 생성 (부가세 별도 필드 관리)
+      const netAmount = total; // 공급가액
+      const vatAmount = Math.floor(netAmount * 0.1); // 부가세 10%
+      const totalAmount = netAmount + vatAmount; // 합계
+
+      await supabase.from("erp_revenue_vouchers").insert([{
+        company_id: companyId,
+        quotation_id: qId,
+        customer_id: (deal as any).customer_id || null,
+        voucher_number: `REV-${Date.now().toString().slice(-6)}`,
+        net_amount: netAmount,
+        vat_amount: vatAmount,
+        total_amount: totalAmount,
+        description: `[영업] ${deal.title} 견적 발행 매출 연동`
+      }]);
+
+      // 6. 시스템 알림 전송
+      await supabase.from("erp_notifications").insert([{
+        company_id: companyId,
+        title: "🚀 견적-재고-매출 연동 성공",
+        message: `${deal.title} 견적 발행으로 재고가 실시간 차감되고 매출 전표가 생성되었습니다.`,
+        type: "success",
+        target_role: "owner"
+      }]);
+
       onSuccess();
     } else {
       alert(qError?.message);
