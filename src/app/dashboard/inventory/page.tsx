@@ -34,6 +34,10 @@ type InventoryItem = {
   target_stock_level: number;
   current_stock: number;
   created_at: string;
+  user_id?: string;
+  profiles?: {
+    full_name: string;
+  };
 };
 
 export default function InventoryPage() {
@@ -65,7 +69,7 @@ export default function InventoryPage() {
       setCompanyId(profile.company_id);
       const { data } = await supabase
         .from("erp_inventory_items")
-        .select("*")
+        .select("*, profiles:erp_profiles(full_name)")
         .eq("company_id", profile.company_id)
         .order("created_at", { ascending: false });
       
@@ -166,14 +170,7 @@ export default function InventoryPage() {
                     <div className="flex flex-col gap-0.5">
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{item.category || "General"}</p>
                       <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest">
-                        등록: {new Date(item.created_at).toLocaleString('ko-KR', { 
-                          year: 'numeric', 
-                          month: '2-digit', 
-                          day: '2-digit', 
-                          hour: '2-digit', 
-                          minute: '2-digit',
-                          hour12: true 
-                        })}
+                        등록: {item.profiles?.full_name || "관리자"} · {new Date(item.created_at).toLocaleDateString('ko-KR')}
                       </p>
                     </div>
                   </div>
@@ -298,8 +295,24 @@ function AddItemModal({ companyId, onClose, onSuccess }: { companyId: string | n
     e.preventDefault();
     if (!companyId) return;
     setSubmitting(true);
+
+    // 유저 정보 가져오기 (등록자 정보 저장용)
+    let userResult = await supabase.auth.getUser();
+    let user = userResult.data.user;
+    
+    if (!user) {
+      const { data: anon } = await supabase.auth.signInAnonymously();
+      user = anon.user;
+    }
+
+    if (!user) {
+      setSubmitting(false);
+      return;
+    }
+
     const { error } = await supabase.from("erp_inventory_items").insert([{
       company_id: companyId,
+      user_id: user.id,
       name: formData.name,
       category: formData.category,
       sku: formData.sku,
@@ -541,7 +554,7 @@ function HistoryModal({ companyId, onClose }: { companyId: string, onClose: () =
                         <div>
                           <p className="font-black text-slate-800">{tx.item?.name || "삭제된 품목"}</p>
                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                            {new Date(tx.created_at).toLocaleString()} · {tx.reason || "사유 없음"}
+                            {new Date(tx.created_at).toLocaleString()} · {tx.profile?.full_name || "매니저"} · {tx.reason || "사유 없음"}
                           </p>
                         </div>
                       </div>

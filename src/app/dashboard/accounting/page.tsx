@@ -294,11 +294,16 @@ function ExpenseTable({ data, selectedIds, onToggleSelect, onSelectAll, onSelect
             <td className="px-8 py-6">{isAdmin && request.status === "pending" && <input type="checkbox" checked={selectedIds.includes(request.id)} onChange={() => onToggleSelect(request.id)} className="w-4 h-4 rounded border-slate-300 text-indigo-600" />}</td>
             <td className="px-8 py-6"><span onClick={() => onSelect(request)} className="font-black text-slate-800 text-sm hover:text-blue-600 transition-all cursor-pointer">{request.title}</span></td>
             <td className="px-8 py-6">
-              <div className="flex flex-col">
-                <span className="text-sm font-black text-slate-700 tracking-tight">{request.profiles?.full_name || "익명"}</span>
-                <span className="text-[9px] text-indigo-400 font-bold uppercase tracking-widest mt-1">
-                  {request.profiles?.erp_departments?.name?.split('(')[0] || "미소속"}
-                </span>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-500 transition-all shadow-sm border border-slate-200">
+                  <UserIcon size={14} />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-sm font-black text-slate-800 tracking-tight">{request.profiles?.full_name || "익명"}</span>
+                  <span className="text-[9px] text-indigo-400 font-bold uppercase tracking-widest mt-0.5 bg-indigo-50 px-1.5 py-0.5 rounded-md w-fit">
+                    {request.profiles?.erp_departments?.name?.split('(')[0] || "미소속"}
+                  </span>
+                </div>
               </div>
             </td>
             <td className="px-8 py-6">
@@ -363,7 +368,9 @@ function DataEntryModal({ type, editData, companyId, onClose, onSuccess }: any) 
   const [file, setFile] = useState<File | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault(); setLoading(true);
+    e.preventDefault(); 
+    setLoading(true);
+    
     let { data: { user } } = await supabase.auth.getUser();
     if (!user) { const { data: anon } = await supabase.auth.signInAnonymously(); user = anon.user; }
     
