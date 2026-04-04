@@ -11,9 +11,11 @@ import {
   Search, 
   ChevronRight,
   Filter,
+  UserPlus,
+  CreditCard,
+  LogOut,
   DollarSign,
-  Activity,
-  UserPlus
+  Activity
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase";
@@ -105,7 +107,6 @@ export default function SalesPage() {
 
       {/* Main Content Areas */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Sales Pipeline Column */}
         <div className="lg:col-span-2 space-y-6">
           <div key="pipeline-header" className="flex items-center justify-between px-4">
             <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
@@ -119,7 +120,7 @@ export default function SalesPage() {
                 <div className="col-span-full py-20 text-center text-slate-300 font-black uppercase tracking-widest">영업 데이터를 불러오는 중...</div>
              ) : deals.length === 0 ? (
                 <div className="col-span-full py-20 text-center border-2 border-dashed border-slate-100 rounded-[32px] text-slate-300 font-black uppercase tracking-widest">
-                  진행 중인 딜이 없습니다.
+                   진행 중인 딜이 없습니다.
                 </div>
              ) : (
                 deals.map(deal => (
@@ -129,7 +130,6 @@ export default function SalesPage() {
           </div>
         </div>
 
-        {/* Sidebar Mini-tables */}
         <div className="space-y-8">
            <div className="p-8 bg-white rounded-[44px] border border-slate-100 shadow-xl shadow-slate-200/40">
              <div className="flex items-center justify-between mb-6">
@@ -180,110 +180,6 @@ export default function SalesPage() {
           />
         )}
       </AnimatePresence>
-    </div>
-  );
-}
-
-function AddCustomerModal({ companyId, onClose, onSuccess }: { companyId: string, onClose: () => void, onSuccess: () => void }) {
-  const [formData, setFormData] = useState({ name: "", email: "", phone: "", company_name: "", business_registration_number: "" });
-  const [submitting, setSubmitting] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitting(true);
-    const { error } = await supabase.from("erp_customers").insert([{ ...formData, company_id: companyId }]);
-    if (!error) onSuccess(); else alert(error.message);
-    setSubmitting(false);
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-md">
-      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white w-full max-w-md rounded-[44px] p-12 shadow-2xl relative">
-        <h3 className="text-2xl font-black text-slate-800 mb-8 tracking-tight text-center">신규 고객 등록</h3>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">담당자 이름</label>
-          <input required className="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none border-none" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></div>
-          <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">회사명</label>
-          <input required className="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none border-none" value={formData.company_name} onChange={e => setFormData({...formData, company_name: e.target.value})} /></div>
-          <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">사업자등록번호</label>
-          <input placeholder="000-00-00000" className="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none border-none" value={formData.business_registration_number} onChange={e => setFormData({...formData, business_registration_number: e.target.value})} /></div>
-          <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">연락처</label>
-          <input className="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none border-none" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} /></div>
-          <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">이메일</label>
-          <input type="email" className="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none border-none" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} /></div>
-          <div className="pt-4 flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 py-4 bg-slate-100 text-slate-600 font-black rounded-2xl text-xs uppercase tracking-widest">취소</button>
-            <button type="submit" disabled={submitting} className="flex-[2] py-4 bg-emerald-600 text-white font-black rounded-2xl text-xs uppercase tracking-widest shadow-xl shadow-emerald-600/20">
-              {submitting ? '등록 중...' : '고객 등록 완료'}
-            </button>
-          </div>
-        </form>
-      </motion.div>
-    </div>
-  );
-}
-
-function AddDealModal({ companyId, onClose, onSuccess }: { companyId: string, onClose: () => void, onSuccess: () => void }) {
-  const [formData, setFormData] = useState({ title: "", amount: "", customer_id: "", stage: "Prospecting" });
-  const [customers, setCustomers] = useState<any[]>([]);
-  const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    supabase.from("erp_customers").select("id, name, company_name").eq("company_id", companyId).then(({ data }) => {
-      if (data) setCustomers(data);
-    });
-  }, []);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitting(true);
-    const { error } = await supabase.from("erp_sales_deals").insert([{
-      ...formData,
-      amount: Number(formData.amount),
-      company_id: companyId,
-      expected_closing_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-    }]);
-    if (!error) onSuccess(); else alert(error.message);
-    setSubmitting(false);
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-md">
-      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white w-full max-w-md rounded-[44px] p-12 shadow-2xl relative">
-        <h3 className="text-2xl font-black text-slate-800 mb-8 tracking-tight text-center">새로운 영업 딜 생성</h3>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">딜 제목</label>
-          <input required placeholder="예: 서버 인프라 구축 건" className="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none border-none" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} /></div>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">거래 금액 (₩)</label>
-            <input type="number" required placeholder="0" className="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none border-none" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} /></div>
-            <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">영업 단계</label>
-            <select className="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none border-none" value={formData.stage} onChange={e => setFormData({...formData, stage: e.target.value})}>
-              <option>Prospecting</option>
-              <option>Proposal</option>
-              <option>Negotiation</option>
-              <option>Closed Won</option>
-              <option>Closed Lost</option>
-            </select></div>
-          </div>
-
-          <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">관리 고객사</label>
-          <select required className="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none border-none" value={formData.customer_id} onChange={e => setFormData({...formData, customer_id: e.target.value})}>
-            <option value="">고객을 선택하세요</option>
-            {customers.map(c => (
-              <option key={c.id} value={c.id}>{c.company_name} ({c.name})</option>
-            ))}
-          </select></div>
-
-          <div className="pt-4 flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 py-4 bg-slate-100 text-slate-600 font-black rounded-2xl text-xs uppercase tracking-widest">취소</button>
-            <button type="submit" disabled={submitting} className="flex-[2] py-4 bg-indigo-600 text-white font-black rounded-2xl text-xs uppercase tracking-widest shadow-xl shadow-indigo-600/20">
-              {submitting ? '생성 중...' : '영업 딜 생성 완료'}
-            </button>
-          </div>
-        </form>
-      </motion.div>
     </div>
   );
 }
@@ -365,7 +261,6 @@ function AddQuotationModal({ companyId, deal, onClose, onSuccess }: { companyId:
     e.preventDefault();
     if (selectedItems.length === 0) return alert("품목을 추가해 주세요.");
     
-    // 1. 실시간 재고 체크 (대표님 지시: 부족 시 아예 차단)
     for (const si of selectedItems) {
       const currentItem = items.find(i => i.id === si.id);
       if (!currentItem || currentItem.current_stock < si.quantity) {
@@ -378,21 +273,19 @@ function AddQuotationModal({ companyId, deal, onClose, onSuccess }: { companyId:
 
     const qNum = `QT-${Date.now().toString().slice(-6)}`;
     
-    // 2. 견적서 메인 데이터 저장
     const { data: qData, error: qError } = await supabase.from("erp_sales_quotations").insert([{
       company_id: companyId,
       deal_id: deal.id,
       customer_id: (deal as any).customer_id || null,
       quotation_number: qNum,
       total_amount: total,
-      status: 'Sent', // 발행 시 바로 'Sent' 상태로 변경
+      status: 'Sent',
       valid_until: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     }]).select();
 
     if (qData) {
       const qId = qData[0].id;
 
-      // 3. 견적 품목 상세 저장
       const itemsToInsert = selectedItems.map(si => ({
         quotation_id: qId,
         item_id: si.id,
@@ -402,17 +295,14 @@ function AddQuotationModal({ companyId, deal, onClose, onSuccess }: { companyId:
       }));
       await supabase.from("erp_sales_quotation_items").insert(itemsToInsert);
 
-      // 4. 재고 차감 및 이력 생성
       for (const si of selectedItems) {
         const currentItem = items.find(i => i.id === si.id);
         const newStock = (currentItem?.current_stock || 0) - si.quantity;
 
-        // 재고 수량 업데이트
         await supabase.from("erp_inventory_items")
           .update({ current_stock: newStock })
           .eq("id", si.id);
 
-        // 출고 이력 생성
         await supabase.from("erp_inventory_transactions").insert([{
           company_id: companyId,
           item_id: si.id,
@@ -423,10 +313,9 @@ function AddQuotationModal({ companyId, deal, onClose, onSuccess }: { companyId:
         }]);
       }
 
-      // 5. 매출 전표 자동 생성 (부가세 별도 필드 관리)
-      const netAmount = total; // 공급가액
-      const vatAmount = Math.floor(netAmount * 0.1); // 부가세 10%
-      const totalAmount = netAmount + vatAmount; // 합계
+      const netAmount = total;
+      const vatAmount = Math.floor(netAmount * 0.1);
+      const totalAmount = netAmount + vatAmount;
 
       await supabase.from("erp_revenue_vouchers").insert([{
         company_id: companyId,
@@ -439,7 +328,6 @@ function AddQuotationModal({ companyId, deal, onClose, onSuccess }: { companyId:
         description: `[영업] ${deal.title} 견적 발행 매출 연동`
       }]);
 
-      // 6. 시스템 알림 전송
       await supabase.from("erp_notifications").insert([{
         company_id: companyId,
         title: "🚀 견적-재고-매출 연동 성공",
@@ -457,20 +345,20 @@ function AddQuotationModal({ companyId, deal, onClose, onSuccess }: { companyId:
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-md overflow-hidden">
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white w-full max-w-4xl max-h-[90vh] rounded-[44px] shadow-2xl overflow-hidden flex flex-col">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white w-full max-w-5xl max-h-[90vh] rounded-[44px] shadow-2xl overflow-hidden flex flex-col">
         {/* Modal Header */}
         <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 print:hidden">
           <div>
-            <h3 className="text-xl font-black text-slate-800 tracking-tight">프리미엄 견적서 생성</h3>
+            <h3 className="text-xl font-black text-slate-800 tracking-tight">프리미엄 견적서 생성 (Premium)</h3>
             <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest italic">{deal.title}</p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors"><Plus className="rotate-45" size={24} /></button>
         </div>
 
         <div className="flex-1 overflow-hidden grid grid-cols-1 md:grid-cols-2 print:block print:overflow-visible">
-          {/* Inventory Side (Hidden in Print) */}
+          {/* Inventory Side */}
           <div className="p-8 border-r border-slate-100 overflow-y-auto bg-slate-20/30 print:hidden">
-            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">재고 품목 선택 (Inventory)</h4>
+            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">재고 품목 선택</h4>
             <div className="space-y-3">
               {items.map(item => (
                 <div key={item.id} className="p-4 bg-white border border-slate-100 rounded-2xl flex items-center justify-between group hover:border-indigo-200 transition-all">
@@ -484,115 +372,237 @@ function AddQuotationModal({ companyId, deal, onClose, onSuccess }: { companyId:
             </div>
           </div>
 
-          {/* Quotation Preview Side */}
-          <div className="p-8 overflow-y-auto flex flex-col print:p-0 print:overflow-visible print:block">
-            {/* Print Header (Only visible in Print) */}
-            <div className="hidden print:block mb-10 pb-6 border-b-2 border-slate-900">
-              <div className="flex justify-between items-start">
+          {/* Premium Preview Side */}
+          <div className="p-8 overflow-y-auto flex flex-col quotation-print-container bg-white">
+            <div className="flex-1 space-y-10 group/quote">
+              <div className="flex justify-between items-start border-b-4 border-slate-900 pb-8">
+                <div className="space-y-3">
+                  <h1 className="text-5xl font-black text-slate-900 tracking-tighter italic">QUOTATION</h1>
+                  <div className="flex items-center gap-2">
+                     <div className="h-1.5 w-1.5 rounded-full bg-emerald-500"></div>
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Premium Sales System</p>
+                  </div>
+                </div>
+                
+                <div className="w-[380px] border-2 border-slate-800 rounded-3xl p-5 bg-slate-50/50 relative shadow-sm">
+                  <div className="absolute -top-3.5 left-5 bg-slate-800 text-white px-2 py-0.5 text-[9px] font-black rounded-md uppercase tracking-widest">Supplier (공급자)</div>
+                  <div className="grid grid-cols-6 gap-x-3 gap-y-2">
+                    <div className="col-span-1 text-[9px] font-black text-slate-400 uppercase">Reg No</div>
+                    <div className="col-span-5 text-sm font-black text-slate-900">123-45-67890</div>
+                    <div className="col-span-1 text-[9px] font-black text-slate-400 uppercase">Owner</div>
+                    <div className="col-span-2 text-xs font-black text-slate-800">이 건 노 (인)</div>
+                    <div className="col-span-3 text-[9px] font-bold text-slate-400 text-right uppercase">지민컴퍼니</div>
+                    <div className="col-span-1 text-[9px] font-black text-slate-400 uppercase align-top">Addr</div>
+                    <div className="col-span-5 text-[10px] font-bold text-slate-500 leading-tight">서울특별시 강남구 테헤란로 2026, 10F</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-end border-b border-slate-100 pb-6">
                 <div>
-                  <h1 className="text-4xl font-black text-slate-900 tracking-tighter mb-2 underline decoration-emerald-500 underline-offset-8 decoration-4">QUOTATION</h1>
-                  <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">NEXO ERP PREMIUM SALES SYSTEM</p>
+                  <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">To. Client</p>
+                  <p className="text-3xl font-black text-slate-800 tracking-tighter underline underline-offset-4 decoration-slate-200">{deal.customer?.name || "귀중"}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-lg font-black text-slate-900">NEXO Business Solution</p>
-                  <p className="text-xs text-slate-500">서울특별시 강남구 테헤란로 123, 10층</p>
-                  <p className="text-xs text-slate-500">Tel: 02-1234-5678 | Email: sales@nexo-erp.com</p>
+                  <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">Quote Date</p>
+                  <p className="text-sm font-black text-slate-600">{new Date().toLocaleDateString()}</p>
                 </div>
               </div>
-            </div>
 
-            <div className="hidden print:flex justify-between mb-8">
-               <div>
-                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">To. Client</h4>
-                  <p className="text-xl font-black text-slate-800">{deal.customer?.name || "Valued Client"}</p>
-               </div>
-               <div className="text-right">
-                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Quote Date</h4>
-                  <p className="text-sm font-black text-slate-800">{new Date().toLocaleDateString()}</p>
-                  <p className="text-[10px] text-slate-400 mt-1 uppercase">Valid until: {new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString()}</p>
-               </div>
-            </div>
-
-            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 px-2 print:mb-4">품목 리스트 (Items)</h4>
-            
-            <div className="print:block">
-              <table className="w-full text-left print:table">
-                <thead className="hidden print:table-header-group">
-                  <tr className="border-b border-slate-200">
-                    <th className="py-2 text-[10px] font-black text-slate-400 uppercase lg:w-1/2">Description</th>
-                    <th className="py-2 text-[10px] font-black text-slate-400 uppercase text-center">Qty</th>
-                    <th className="py-2 text-[10px] font-black text-slate-400 uppercase text-right">Price</th>
-                  </tr>
-                </thead>
-                <tbody className="print:table-row-group">
-                  {selectedItems.length === 0 && (
-                    <tr className="print:hidden">
-                      <td colSpan={3} className="py-20 text-center text-slate-300 font-black uppercase tracking-widest text-xs">
-                        품목을 선택해 주세요
-                      </td>
+              <div className="min-h-[200px]">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-slate-900 text-[10px] font-black text-white uppercase tracking-widest text-center">
+                      <td className="py-3 px-2 rounded-l-xl w-12 border-r border-white/10">No</td>
+                      <td className="py-3 px-4 text-left">Item (품목)</td>
+                      <td className="py-3 px-2 w-20">Qty</td>
+                      <td className="py-3 px-4 text-right rounded-r-xl">Amount (Net)</td>
                     </tr>
-                  )}
-                  {selectedItems.map(si => (
-                    <tr key={si.id} className="print:border-b print:border-slate-50 group flex items-center gap-4 bg-indigo-50/30 p-4 rounded-2xl mb-4 print:bg-transparent print:p-0 print:mb-0 print:table-row">
-                      <td className="flex-1 print:py-4 print:table-cell">
-                        <p className="text-sm font-black text-indigo-900 print:text-slate-800">{si.name}</p>
-                        <p className="text-[10px] font-bold text-indigo-400 print:hidden">단가: ₩{si.unit_price.toLocaleString()}</p>
-                      </td>
-                      <td className="flex items-center gap-2 print:table-cell print:text-center print:py-4">
-                        <input type="number" min="1" className="w-16 p-2 bg-white rounded-xl text-center font-black text-sm outline-none border border-indigo-100 print:hidden" value={si.quantity} onChange={e => updateQty(si.id, Number(e.target.value))} />
-                        <span className="hidden print:inline font-black text-slate-800">{si.quantity} EA</span>
-                        <button onClick={() => removeItem(si.id)} className="text-rose-400 hover:text-rose-600 p-1 print:hidden"><Plus className="rotate-45" size={20} /></button>
-                      </td>
-                      <td className="hidden print:table-cell print:text-right print:py-4 font-black text-slate-800">
-                        ₩{(si.unit_price * si.quantity).toLocaleString()}
-                      </td>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {selectedItems.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="py-20 text-center text-slate-300 font-black uppercase tracking-widest text-xs">품목을 추가해 주세요</td>
+                      </tr>
+                    )}
+                    {selectedItems.map((si, idx) => (
+                      <tr key={si.id} className="group/row">
+                        <td className="py-4 text-center font-bold text-slate-300 text-xs">{idx + 1}</td>
+                        <td className="py-4 px-4">
+                          <p className="font-black text-slate-800 text-sm">{si.name}</p>
+                        </td>
+                        <td className="py-4 px-2 text-center">
+                           <div className="flex items-center justify-center gap-1 group/qty">
+                              <input type="number" min="1" className="w-12 p-1 bg-slate-50 rounded-lg text-center font-black text-xs outline-none print:hidden" value={si.quantity} onChange={e => updateQty(si.id, Number(e.target.value))} />
+                              <span className="hidden print:inline font-black text-slate-800 text-xs">{si.quantity} EA</span>
+                              <button onClick={() => removeItem(si.id)} className="text-rose-300 hover:text-rose-500 p-0.5 print:hidden"><Plus className="rotate-45" size={14} /></button>
+                           </div>
+                        </td>
+                        <td className="py-4 px-4 text-right font-black text-slate-700 text-sm">₩{(si.unit_price * si.quantity).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="border-t-2 border-slate-900">
+                    <tr>
+                      <td colSpan={3} className="py-4 px-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Net Total</td>
+                      <td className="py-4 px-4 text-right font-black text-slate-800">₩{total.toLocaleString()}</td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="pt-6 border-t border-slate-100 mt-auto print:mt-12 print:border-none print:pt-0">
-              <div className="flex justify-between items-end mb-6 px-2 print:px-0">
-                <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Total Amount</p>
-                <p className="text-3xl font-black text-indigo-600 tracking-tighter print:text-slate-900">₩{total.toLocaleString()}</p>
+                    <tr>
+                      <td colSpan={3} className="py-2 px-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">VAT 10%</td>
+                      <td className="py-2 px-4 text-right font-bold text-slate-400">₩{Math.floor(total * 0.1).toLocaleString()}</td>
+                    </tr>
+                  </tfoot>
+                </table>
               </div>
-              <div className="flex gap-3 print:hidden">
-                <button onClick={() => window.print()} className="flex-1 py-5 bg-white border border-slate-200 text-slate-600 font-black rounded-2xl uppercase tracking-widest text-xs hover:bg-slate-50 transition-all flex items-center justify-center gap-2">
-                   PDF 미리보기 / 인쇄
-                </button>
-                <button onClick={handleSubmit} disabled={submitting} className="flex-[2] py-5 bg-indigo-600 text-white font-black rounded-2xl shadow-xl shadow-indigo-600/20 uppercase tracking-widest text-xs hover:bg-indigo-700 active:scale-95 transition-all">
-                  {submitting ? '생성 중...' : '견적서 최종 발행'}
-                </button>
-              </div>
-            </div>
 
-            <div className="hidden print:block mt-12 pt-6 border-t border-slate-100">
-               <p className="text-[10px] text-slate-400 italic">본 견적서는 발행일로부터 14일간 유효합니다. 상기 품목은 요청 시점에 따라 재고 상황이 변동될 수 있습니다.</p>
-               <div className="mt-20 flex justify-end">
-                  <div className="text-center">
-                     <p className="text-xs font-black text-slate-400 mb-8 uppercase">Authorized Signature</p>
-                     <div className="w-40 border-b border-slate-400"></div>
-                  </div>
-               </div>
+              <div className="grid grid-cols-3 gap-8 pt-8 border-t border-slate-100">
+                 <div className="col-span-2 p-6 bg-slate-50/50 rounded-3xl border border-slate-100">
+                    <div className="flex items-center gap-2 mb-3">
+                      <CreditCard size={14} className="text-indigo-400" />
+                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">입금 안내</h4>
+                    </div>
+                    <p className="text-sm font-black text-slate-700 italic">우리은행 1002-2026-NEXO-01 (지민컴퍼니)</p>
+                 </div>
+                 <div className="flex flex-col items-center justify-center relative">
+                    <div className="absolute w-16 h-16 bg-rose-500/5 rounded-full border-2 border-rose-500/20 rotate-[-15deg] flex items-center justify-center">
+                       <p className="text-[9px] font-black text-rose-500 leading-none">이 건 노<br />(인)</p>
+                    </div>
+                 </div>
+              </div>
+
+              <div className="mt-10 pt-8 border-t-4 border-slate-900">
+                <div className="flex justify-between items-end mb-8 px-2">
+                  <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Grand Total</p>
+                  <p className="text-5xl font-black text-indigo-600 tracking-tighter">₩{(total * 1.1).toLocaleString()}</p>
+                </div>
+                <div className="flex gap-3 print:hidden">
+                  <button onClick={() => window.print()} className="flex-1 py-5 bg-white border-2 border-slate-100 text-slate-600 font-black rounded-3xl uppercase tracking-widest text-xs">PDF 인쇄</button>
+                  <button onClick={handleSubmit} disabled={submitting} className="flex-[2] py-5 bg-indigo-600 text-white font-black rounded-[28px] uppercase tracking-widest text-xs">
+                    {submitting ? '생성 중...' : '최종 발행'}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </motion.div>
       <style jsx global>{`
         @media print {
-          body * { visibility: hidden; }
-          .print\\:block, .print\\:block * { visibility: visible; }
-          .print\\:block { 
-            position: absolute; 
-            left: 0; 
-            top: 0; 
-            width: 100%;
-            padding: 40px !important;
+          body, html { background: white !important; }
+          #sidebar, nav, header, .print-hidden, button, .print\:hidden { display: none !important; }
+          .quotation-print-container {
+            position: fixed !important; top: 0 !important; left: 0 !important; width: 100% !important;
+            padding: 40px !important; visibility: visible !important; display: block !important;
+            z-index: 9999 !important; background: white !important;
           }
-          .print\\:hidden { display: none !important; }
+          .fixed.inset-0 { background: transparent !important; position: static !important; }
+          #__next > div, main { display: block !important; }
         }
       `}</style>
+    </div>
+  );
+}
+
+function AddCustomerModal({ companyId, onClose, onSuccess }: { companyId: string, onClose: () => void, onSuccess: () => void }) {
+  const [formData, setFormData] = useState({ name: "", email: "", phone: "", company_name: "", business_registration_number: "" });
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    const { error } = await supabase.from("erp_customers").insert([{ ...formData, company_id: companyId }]);
+    if (!error) onSuccess(); else alert(error.message);
+    setSubmitting(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-md">
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white w-full max-w-md rounded-[44px] p-12 shadow-2xl relative">
+        <h3 className="text-2xl font-black text-slate-800 mb-8 tracking-tight text-center">신규 고객 등록</h3>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">담당자 이름</label>
+          <input required className="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none border-none" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></div>
+          <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">회사명</label>
+          <input required className="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none border-none" value={formData.company_name} onChange={e => setFormData({...formData, company_name: e.target.value})} /></div>
+          <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">사업자등록번호</label>
+          <input placeholder="000-00-00000" className="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none border-none" value={formData.business_registration_number} onChange={e => setFormData({...formData, business_registration_number: e.target.value})} /></div>
+          <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">연락처</label>
+          <input className="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none border-none" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} /></div>
+          <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">이메일</label>
+          <input type="email" className="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none border-none" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} /></div>
+          <div className="pt-4 flex gap-3">
+            <button type="button" onClick={onClose} className="flex-1 py-4 bg-slate-100 text-slate-600 font-black rounded-2xl text-xs uppercase tracking-widest">취소</button>
+            <button type="submit" disabled={submitting} className="flex-[2] py-4 bg-emerald-600 text-white font-black rounded-2xl text-xs uppercase tracking-widest shadow-xl shadow-emerald-600/20">
+              {submitting ? "등록 중..." : "고객 등록 완료"}
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </div>
+  );
+}
+
+function AddDealModal({ companyId, onClose, onSuccess }: { companyId: string, onClose: () => void, onSuccess: () => void }) {
+  const [formData, setFormData] = useState({ title: "", amount: "", customer_id: "", stage: "Prospecting" });
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    supabase.from("erp_customers").select("id, name, company_name").eq("company_id", companyId).then(({ data }) => {
+      if (data) setCustomers(data);
+    });
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    const { error } = await supabase.from("erp_sales_deals").insert([{
+      ...formData,
+      amount: Number(formData.amount),
+      company_id: companyId,
+      expected_closing_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
+    }]);
+    if (!error) onSuccess(); else alert(error.message);
+    setSubmitting(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-md">
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white w-full max-w-md rounded-[44px] p-12 shadow-2xl relative">
+        <h3 className="text-2xl font-black text-slate-800 mb-8 tracking-tight text-center">새로운 영업 딜 생성</h3>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">딜 제목</label>
+          <input required placeholder="예: 서버 인프라 구축 건" className="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none border-none" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} /></div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">거래 금액 (₩)</label>
+            <input type="number" required placeholder="0" className="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none border-none" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} /></div>
+            <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">영업 단계</label>
+            <select className="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none border-none" value={formData.stage} onChange={e => setFormData({...formData, stage: e.target.value})}>
+              <option>Prospecting</option>
+              <option>Proposal</option>
+              <option>Negotiation</option>
+              <option>Closed Won</option>
+              <option>Closed Lost</option>
+            </select></div>
+          </div>
+
+          <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">관리 고객사</label>
+          <select required className="w-full p-4 bg-slate-50 rounded-2xl font-bold outline-none border-none" value={formData.customer_id} onChange={e => setFormData({...formData, customer_id: e.target.value})}>
+            <option value="">고객을 선택하세요</option>
+            {customers.map(c => (
+              <option key={c.id} value={c.id}>{c.company_name} ({c.name})</option>
+            ))}
+          </select></div>
+
+          <div className="pt-4 flex gap-3">
+            <button type="button" onClick={onClose} className="flex-1 py-4 bg-slate-100 text-slate-600 font-black rounded-2xl text-xs uppercase tracking-widest">취소</button>
+            <button type="submit" disabled={submitting} className="flex-[2] py-4 bg-indigo-600 text-white font-black rounded-2xl text-xs uppercase tracking-widest shadow-xl shadow-indigo-600/20">
+              {submitting ? "생성 중..." : "영업 딜 생성 완료"}
+            </button>
+          </div>
+        </form>
+      </motion.div>
     </div>
   );
 }
@@ -601,7 +611,7 @@ function MiniProfile({ name, company, status, color }: { name: string, company: 
   return (
     <div className="flex items-center justify-between group cursor-pointer">
       <div className="flex items-center gap-3">
-        <div className={`w-10 h-10 ${color} rounded-2xl flex items-center justify-center text-white font-black text-sm shadow-lg shadow-${color.split('-')[1]}-500/20`}>
+        <div className={`w-10 h-10 ${color} rounded-2xl flex items-center justify-center text-white font-black text-sm`}>
           {name.charAt(0)}
         </div>
         <div>

@@ -81,39 +81,52 @@ export default function AccountingPage() {
   const [userRole, setUserRole] = useState<string>("staff");
 
   const initializeUserContext = async () => {
-    let { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      const { data: anon } = await supabase.auth.signInAnonymously();
-      user = anon.user;
-    }
+    try {
+      let { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        const { data: anon } = await supabase.auth.signInAnonymously();
+        user = anon.user;
+      }
 
-    if (user) {
-      const { data: profile } = await supabase
-        .from("erp_profiles")
-        .select("company_id, role")
-        .eq("id", user.id)
-        .single();
+      if (user) {
+        const { data: profile } = await supabase
+          .from("erp_profiles")
+          .select("company_id, role")
+          .select("company_id, role, full_name")
+          .eq("id", user.id)
+          .single();
 
-      if (profile) {
-        setCompanyId(profile.company_id);
-        setUserRole(profile.role || "staff");
-        return { companyId: profile.company_id, role: profile.role || "staff" };
-      } else {
-        const { data: companies } = await supabase.from("erp_companies").select("id").eq("name", "지민컴퍼니");
-        const company = companies?.[0];
-        if (company) {
-          const role = "admin";
-          await supabase.from("erp_profiles").upsert({
-            id: user.id,
-            company_id: company.id,
-            full_name: "지민컴퍼니 대표님",
-            role: role
-          });
-          setCompanyId(company.id);
-          setUserRole(role);
-          return { companyId: company.id, role: role };
+        if (profile && profile.company_id) {
+          setCompanyId(profile.company_id);
+          setUserRole(profile.role || "staff");
+          return { companyId: profile.company_id, role: profile.role || "staff" };
+        } else {
+          // If profile exists but company_id is missing, or no profile at all
+          const { data: companies } = await supabase.from("erp_companies").select("id").eq("name", "지민컴퍼니");
+          const company = companies?.[0];
+          if (company) {
+            const role = profile?.role || (user.app_metadata?.role as string) || "admin";
+            const { error: upsertError } = await supabase.from("erp_profiles").upsert({
+              id: user.id,
+              company_id: company.id,
+              full_name: profile?.full_name || (user.user_metadata?.full_name) || (user.email ? user.email.split("@")[0] : "NEXO 오너"),
+              role: role,
+              updated_at: new Date().toISOString()
+            });
+            
+            if (upsertError) {
+              console.error("Profile upsert failed:", upsertError);
+              // If RLS blocked it, we still want the dashboard to work with the ID we found
+            }
+            
+            setCompanyId(company.id);
+            setUserRole(role);
+            return { companyId: company.id, role: role };
+          }
         }
       }
+    } catch (err) {
+      console.error("User context error:", err);
     }
     return null;
   };
@@ -122,14 +135,59 @@ export default function AccountingPage() {
     setLoading(true);
     const context = await initializeUserContext();
     if (context?.companyId) {
-      const { data: reqData } = await supabase
-        .from("erp_requests")
-        .select("*, profiles:erp_profiles(full_name, erp_departments(name))")
-        .eq("company_id", context.companyId)
-        .order("created_at", { ascending: false });
-      const { data: incData } = await supabase.from("erp_income").select("*").eq("company_id", context.companyId).order("date", { ascending: false });
-      if (reqData) setRequests(reqData);
-      if (incData) setIncomeList(incData);
+      try {
+        // Step 1: Fetch raw requests
+        const { data: reqData, error: reqError } = await supabase
+          .from("erp_requests")
+          .select("*")
+          .eq("company_id", context.companyId)
+          .order("created_at", { ascending: false });
+        
+        if (reqError) throw reqError;
+
+        if (reqData) {
+          // Step 2: Fetch profiles for the unique user_ids found
+          const userIds = Array.from(new Set(reqData.map(r => r.user_id).filter(Boolean)));
+          
+          let { data: { user: currentUser } } = await supabase.auth.getUser();
+
+          if (userIds.length > 0) {
+            const { data: profilesData } = await supabase
+              .from("erp_profiles")
+              .select("id, full_name, erp_departments(name)")
+              .in("id", userIds);
+            
+            // Step 3: Merge profile data into requests
+            const profileMap = new Map(profilesData?.map(p => [p.id, p]));
+            const mergedRequests = reqData.map(r => {
+              const profile = profileMap.get(r.user_id);
+              // Fallback for current user if profile is missing (RLS issue)
+              if (!profile && currentUser && r.user_id === currentUser.id) {
+                return {
+                  ...r,
+                  profiles: {
+                    full_name: currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0] || "NEXO 오너",
+                    erp_departments: { name: "지민컴퍼니 본부" }
+                  }
+                };
+              }
+              return { ...r, profiles: profile };
+            });
+            setRequests(mergedRequests as ERPRequest[]);
+          } else {
+            setRequests(reqData as ERPRequest[]);
+          }
+        }
+        
+        const { data: incData, error: incError } = await supabase.from("erp_income").select("*").eq("company_id", context.companyId).order("date", { ascending: false });
+        if (incData) setIncomeList(incData as ERPIncome[]);
+        
+      } catch (err: any) {
+        console.error("Fetch implementation error:", err);
+        // Minimal fallback
+        const { data } = await supabase.from("erp_requests").select("*").eq("company_id", context.companyId).limit(20);
+        if (data) setRequests(data as ERPRequest[]);
+      }
     }
     setLoading(false);
   };
@@ -143,8 +201,8 @@ export default function AccountingPage() {
     }
     const { error } = await supabase.from("erp_requests").update({ status: newStatus }).eq("id", id);
     if (!error) {
-      setRequests(prev => prev.map(r => r.id === id ? { ...r, status: newStatus } : r));
-      if (selectedRequest?.id === id) setSelectedRequest(prev => prev ? { ...prev, status: newStatus } : null);
+      setRequests((prev: ERPRequest[]) => prev.map(r => r.id === id ? { ...r, status: newStatus } : r));
+      if (selectedRequest?.id === id) setSelectedRequest((prev: ERPRequest | null) => prev ? { ...prev, status: newStatus } : null);
     }
   };
 
@@ -153,15 +211,15 @@ export default function AccountingPage() {
     const table = type === "expense" ? "erp_requests" : "erp_income";
     const { error } = await supabase.from(table).delete().eq("id", id);
     if (!error) {
-      if (type === "expense") setRequests(prev => prev.filter(r => r.id !== id));
-      else setIncomeList(prev => prev.filter(i => i.id !== id));
+      if (type === "expense") setRequests((prev: ERPRequest[]) => prev.filter(r => r.id !== id));
+      else setIncomeList((prev: ERPIncome[]) => prev.filter(i => i.id !== id));
       setSelectedRequest(null);
       setSelectedIncome(null);
     }
   };
 
-  const totalExpense = requests.filter(r => r.status === "approved").reduce((acc, curr) => acc + Number(curr.amount), 0);
-  const totalIncome = incomeList.reduce((acc, curr) => acc + Number(curr.amount), 0);
+  const totalExpense = requests.filter((r: ERPRequest) => r.status === "approved").reduce((acc: number, curr: ERPRequest) => acc + Number(curr.amount), 0);
+  const totalIncome = incomeList.reduce((acc: number, curr: ERPIncome) => acc + Number(curr.amount), 0);
   const netProfit = totalIncome - totalExpense;
   const isAdmin = userRole === "admin" || userRole === "owner";
 
@@ -374,7 +432,14 @@ function DataEntryModal({ type, editData, companyId, onClose, onSuccess }: any) 
     let { data: { user } } = await supabase.auth.getUser();
     if (!user) { const { data: anon } = await supabase.auth.signInAnonymously(); user = anon.user; }
     
-    if (user && companyId) {
+    let currentCompanyId = companyId;
+    if (!currentCompanyId && user) {
+       // Backup: Try to fetch it again if missing from props
+       const { data: profile } = await supabase.from("erp_profiles").select("company_id").eq("id", user.id).single();
+       if (profile) currentCompanyId = profile.company_id;
+    }
+
+    if (user && currentCompanyId) {
       let receiptUrl = editData?.receipt_url || null;
 
       // Handle File Upload
@@ -414,7 +479,15 @@ function DataEntryModal({ type, editData, companyId, onClose, onSuccess }: any) 
       };
 
       const query = editData ? supabase.from(table).update(payload).eq("id", editData.id) : supabase.from(table).insert([payload]);
-      const { error } = await query; if (!error) onSuccess(); else alert("Error: " + error.message);
+      const { error } = await query; 
+      if (!error) {
+        onSuccess(); 
+      } else {
+        console.error("Registration error:", error);
+        alert("등록 실패: " + error.message);
+      }
+    } else {
+      alert("로그인 세션이나 회사 정보가 유효하지 않습니다. 다시 시도해 주세요.");
     }
     setLoading(false);
   };

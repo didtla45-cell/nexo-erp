@@ -67,23 +67,54 @@ export default function InventoryPage() {
 
     if (profile) {
       setCompanyId(profile.company_id);
-      const { data } = await supabase
-        .from("erp_inventory_items")
-        .select("*, profiles:erp_profiles(full_name)")
-        .eq("company_id", profile.company_id)
-        .order("created_at", { ascending: false });
-      
-      if (data) setItems(data);
+      try {
+        // Step 1: Fetch raw inventory items
+        const { data: invData, error: invError } = await supabase
+          .from("erp_inventory_items")
+          .select("*")
+          .eq("company_id", profile.company_id)
+          .order("created_at", { ascending: false });
+        
+        if (invError) throw invError;
 
-      const today = new Date();
-      today.setHours(today.getHours() - 24);
-      const { count } = await supabase
-        .from("erp_inventory_transactions")
-        .select("*", { count: 'exact', head: true })
-        .eq("company_id", profile.company_id)
-        .gte("created_at", today.toISOString());
-      
-      setRecentTxCount(count || 0);
+        if (invData) {
+          // Step 2: Fetch profiles for the unique user_ids found
+          const userIds = Array.from(new Set(invData.map(r => r.user_id).filter(Boolean)));
+          
+          if (userIds.length > 0) {
+            const { data: profilesData } = await supabase
+              .from("erp_profiles")
+              .select("id, full_name")
+              .in("id", userIds);
+            
+            // Step 3: Merge profile data into items
+            const profileMap = new Map(profilesData?.map(p => [p.id, p]));
+            const mergedItems = invData.map(item => ({
+              ...item,
+              profiles: profileMap.get(item.user_id)
+            }));
+            setItems(mergedItems);
+          } else {
+            setItems(invData);
+          }
+        }
+
+        const today = new Date();
+        today.setHours(today.getHours() - 24);
+        const { count } = await supabase
+          .from("erp_inventory_transactions")
+          .select("*", { count: 'exact', head: true })
+          .eq("company_id", profile.company_id)
+          .gte("created_at", today.toISOString());
+        
+        setRecentTxCount(count || 0);
+
+      } catch (err: any) {
+        console.error("Inventory fetch error:", err);
+        // Minimal fallback
+        const { data } = await supabase.from("erp_inventory_items").select("*").eq("company_id", profile.company_id).limit(50);
+        if (data) setItems(data);
+      }
     }
     setLoading(false);
   };
@@ -169,8 +200,8 @@ export default function InventoryPage() {
                     <h3 className="font-black text-slate-800 tracking-tight">{item.name}</h3>
                     <div className="flex flex-col gap-0.5">
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{item.category || "General"}</p>
-                      <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest">
-                        등록: {item.profiles?.full_name || "관리자"} · {new Date(item.created_at).toLocaleDateString('ko-KR')}
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">
+                        {item.profiles?.full_name || "관리자"} · {item.sku || "N/A"}
                       </p>
                     </div>
                   </div>
