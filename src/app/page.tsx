@@ -116,12 +116,12 @@ export default function LandingPage() {
                <div className="mx-auto w-1/3 h-4 bg-slate-800 rounded-md"></div>
             </div>
             <img 
-              src="/dashboard-preview.png" 
+              src="https://jetski-public-screenshots.s3.amazonaws.com/nexo_erp_dashboard_updated_346675790C2274AF4C3A8D399FE6C646.png" 
               alt="NEXO ERP Dashboard" 
               className="w-full opacity-90 group-hover:scale-[1.01] transition-transform duration-700"
             />
           </div>
-        </motion.div>
+        </motion.div>Section
       </section>
 
       {/* Features Grid */}
