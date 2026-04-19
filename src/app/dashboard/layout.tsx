@@ -14,6 +14,7 @@ import {
   Calendar,
   Building2,
   Package,
+  Truck,
   TrendingUp,
   Bell,
   CheckCircle2,
@@ -150,11 +151,12 @@ export default function DashboardLayout({
               <>
                 <SidebarItem icon={<LayoutDashboard size={20} />} label="대시보드" href="/dashboard" />
                 
-                {hasPerm('accounting') && <SidebarItem icon={<FileText size={20} />} label="지출 결재" href="/dashboard/accounting" />}
+                {hasPerm('accounting') && <SidebarItem icon={<FileText size={20} />} label="회계 및 전표" href="/dashboard/accounting" />}
                 {hasPerm('hr') && <SidebarItem icon={<Calendar size={20} />} label="연차/반차 결재" href="/dashboard/hr" />}
                 {hasPerm('finance') && <SidebarItem icon={<CreditCard size={20} />} label="회계 통계" href="/dashboard/finance" />}
                 {hasPerm('members') && <SidebarItem icon={<Users size={20} />} label="임직원 관리" href="/dashboard/members" />}
                 {hasPerm('inventory') && <SidebarItem icon={<Package size={20} />} label="재고 관리" href="/dashboard/inventory" />}
+                {hasPerm('logistics') && <SidebarItem icon={<Truck size={20} />} label="물류 및 배송" href="/dashboard/logistics" />}
                 {hasPerm('sales') && <SidebarItem icon={<TrendingUp size={20} />} label="영업 관리" href="/dashboard/sales" />}
                 {hasPerm('quotations') && <SidebarItem icon={<FileText size={20} />} label="견적서 관리" href="/dashboard/quotations" />}
                 

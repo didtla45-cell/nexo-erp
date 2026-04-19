@@ -17,10 +17,13 @@ import {
   Truck,
   History,
   Trash2,
-  Edit2
+  Edit2,
+  PlusCircle
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase";
+import { QRCodeCanvas } from "qrcode.react";
+import Scanner from "@/components/Scanner";
 
 type InventoryItem = {
   id: string;
@@ -33,6 +36,7 @@ type InventoryItem = {
   min_stock_level: number;
   target_stock_level: number;
   current_stock: number;
+  barcode: string | null;
   created_at: string;
   user_id?: string;
   profiles?: {
@@ -53,6 +57,8 @@ export default function InventoryPage() {
   const [stockType, setStockType] = useState<"in" | "out">("in");
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [recentTxCount, setRecentTxCount] = useState(0);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const fetchData = async () => {
     setLoading(true);
@@ -68,7 +74,6 @@ export default function InventoryPage() {
     if (profile) {
       setCompanyId(profile.company_id);
       try {
-        // Step 1: Fetch raw inventory items
         const { data: invData, error: invError } = await supabase
           .from("erp_inventory_items")
           .select("*")
@@ -78,7 +83,6 @@ export default function InventoryPage() {
         if (invError) throw invError;
 
         if (invData) {
-          // Step 2: Fetch profiles for the unique user_ids found
           const userIds = Array.from(new Set(invData.map(r => r.user_id).filter(Boolean)));
           
           if (userIds.length > 0) {
@@ -87,7 +91,6 @@ export default function InventoryPage() {
               .select("id, full_name")
               .in("id", userIds);
             
-            // Step 3: Merge profile data into items
             const profileMap = new Map(profilesData?.map(p => [p.id, p]));
             const mergedItems = invData.map(item => ({
               ...item,
@@ -111,7 +114,6 @@ export default function InventoryPage() {
 
       } catch (err: any) {
         console.error("Inventory fetch error:", err);
-        // Minimal fallback
         const { data } = await supabase.from("erp_inventory_items").select("*").eq("company_id", profile.company_id).limit(50);
         if (data) setItems(data);
       }
@@ -126,6 +128,13 @@ export default function InventoryPage() {
   const totalValue = items.reduce((acc: number, curr: InventoryItem) => acc + (curr.unit_price * curr.current_stock), 0);
   const lowStockItems = items.filter((item: InventoryItem) => item.current_stock <= item.min_stock_level).length;
 
+  const filteredItems = items.filter(item => 
+    item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (item.sku && item.sku.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (item.barcode && item.barcode.toLowerCase() === searchQuery.toLowerCase()) ||
+    (item.category && item.category.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
       {/* Header Section */}
@@ -137,12 +146,20 @@ export default function InventoryPage() {
             <p className="text-xs font-black text-slate-700 tracking-tight">지능형 자산 및 재고 관리</p>
           </div>
         </div>
-        <button 
-          onClick={() => setIsAddModalOpen(true)}
-          className="px-8 py-3.5 bg-indigo-600 text-white text-sm font-black rounded-2xl hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-600/20 active:scale-95 flex items-center gap-2"
-        >
-          <Plus size={20} /> 물품 등록
-        </button>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => setIsScannerOpen(true)}
+            className="px-6 py-3.5 bg-white text-indigo-600 text-sm font-black rounded-2xl border border-indigo-100 hover:bg-slate-50 transition-all shadow-sm active:scale-95 flex items-center gap-2"
+          >
+            <Search size={20} /> 바코드 검색
+          </button>
+          <button 
+            onClick={() => setIsAddModalOpen(true)}
+            className="px-8 py-3.5 bg-indigo-600 text-white text-sm font-black rounded-2xl hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-600/20 active:scale-95 flex items-center gap-2"
+          >
+            <Plus size={20} /> 물품 등록
+          </button>
+        </div>
       </div>
 
       {/* Stat Cards */}
@@ -166,7 +183,9 @@ export default function InventoryPage() {
           <input 
             type="text" 
             placeholder="물품명, SKU, 카테고리 검색..." 
-            className="w-full pl-12 pr-4 py-2.5 bg-slate-50 border-none rounded-xl text-sm font-bold outline-none placeholder:text-slate-300"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-12 pr-4 py-2.5 bg-slate-50 border-none rounded-xl text-sm font-bold outline-none placeholder:text-slate-300 focus:ring-2 ring-indigo-500/10 transition-all"
           />
         </div>
       </div>
@@ -175,10 +194,12 @@ export default function InventoryPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {loading ? (
           <div className="col-span-full py-20 text-center"><RefreshCw className="animate-spin mx-auto text-indigo-400 mb-4" /> <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Loading Inventory...</p></div>
-        ) : items.length === 0 ? (
-          <div className="col-span-full py-20 text-center text-slate-300 font-black uppercase tracking-widest border-2 border-dashed border-slate-100 rounded-[32px]">등록된 재고가 없습니다.</div>
+        ) : filteredItems.length === 0 ? (
+          <div className="col-span-full py-20 text-center text-slate-300 font-black uppercase tracking-widest border-2 border-dashed border-slate-100 rounded-[32px]">
+            {searchQuery ? "검색 결과가 없습니다." : "등록된 재고가 없습니다."}
+          </div>
         ) : (
-          items.map(item => (
+          filteredItems.map(item => (
             <motion.div 
               key={item.id} 
               initial={{ opacity: 0, scale: 0.95 }}
@@ -200,13 +221,28 @@ export default function InventoryPage() {
                     <h3 className="font-black text-slate-800 tracking-tight">{item.name}</h3>
                     <div className="flex flex-col gap-0.5">
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{item.category || "General"}</p>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">
-                        {item.profiles?.full_name || "관리자"} · {item.sku || "N/A"}
+                      <p className="text-[10px] font-black text-slate-700 uppercase tracking-widest mt-0.5">
+                         {item.sku || "No SKU"}
                       </p>
                     </div>
                   </div>
                 </div>
-                <div className="relative">
+
+                {/* Custom NEXO QR Display */}
+                <div className="flex flex-col items-center justify-center p-3 bg-slate-50 rounded-2xl border border-slate-100 group-hover:bg-indigo-50 transition-colors">
+                  {item.barcode ? (
+                    <QRCodeCanvas value={item.barcode} size={64} level="H" />
+                  ) : (
+                    <div className="w-16 h-16 flex items-center justify-center border-2 border-dashed border-slate-200 rounded-xl">
+                      <PlusCircle className="text-slate-200" size={24} />
+                    </div>
+                  )}
+                  <p className="text-[8px] font-black text-slate-400 mt-2 uppercase tracking-widest group-hover:text-indigo-600 transition-colors">NEXO CUSTOM QR</p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between mb-4">
+                 <div className="relative">
                   <button 
                     onClick={() => setActiveMenuId(activeMenuId === item.id ? null : item.id)}
                     className="p-2 text-slate-300 hover:text-indigo-600 transition-colors"
@@ -219,7 +255,7 @@ export default function InventoryPage() {
                         initial={{ opacity: 0, scale: 0.9, y: -10 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.9, y: -10 }}
-                        className="absolute right-0 top-12 w-40 bg-white border border-slate-100 rounded-3xl shadow-2xl z-20 flex flex-col p-2 overflow-hidden"
+                        className="absolute left-0 top-12 w-40 bg-white border border-slate-100 rounded-3xl shadow-2xl z-20 flex flex-col p-2 overflow-hidden"
                       >
                         <button 
                           onClick={() => { setSelectedItem(item); setIsEditModalOpen(true); setActiveMenuId(null); }}
@@ -286,6 +322,16 @@ export default function InventoryPage() {
         {isDeleteModalOpen && selectedItem && <DeleteModal item={selectedItem} onClose={() => setIsDeleteModalOpen(false)} onSuccess={() => { setIsDeleteModalOpen(false); fetchData(); }} />}
         {isStockModalOpen && selectedItem && <StockModal item={selectedItem} type={stockType} onClose={() => setIsStockModalOpen(false)} onSuccess={() => { setIsStockModalOpen(false); fetchData(); }} />}
         {isHistoryModalOpen && companyId && <HistoryModal companyId={companyId} onClose={() => setIsHistoryModalOpen(false)} />}
+        
+        {isScannerOpen && (
+          <Scanner 
+            onScan={(text) => {
+              setSearchQuery(text);
+              setIsScannerOpen(false);
+            }}
+            onClose={() => setIsScannerOpen(false)}
+          />
+        )}
       </AnimatePresence>
     </div>
   );
@@ -318,7 +364,8 @@ function AddItemModal({ companyId, onClose, onSuccess }: { companyId: string | n
     unit_price: "", 
     min_stock_level: "10", 
     current_stock: "0",
-    target_stock_level: "100"
+    target_stock_level: "100",
+    barcode: ""
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -327,19 +374,8 @@ function AddItemModal({ companyId, onClose, onSuccess }: { companyId: string | n
     if (!companyId) return;
     setSubmitting(true);
 
-    // 유저 정보 가져오기 (등록자 정보 저장용)
-    let userResult = await supabase.auth.getUser();
-    let user = userResult.data.user;
-    
-    if (!user) {
-      const { data: anon } = await supabase.auth.signInAnonymously();
-      user = anon.user;
-    }
-
-    if (!user) {
-      setSubmitting(false);
-      return;
-    }
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setSubmitting(false); return; }
 
     const { error } = await supabase.from("erp_inventory_items").insert([{
       company_id: companyId,
@@ -350,7 +386,8 @@ function AddItemModal({ companyId, onClose, onSuccess }: { companyId: string | n
       unit_price: Number(formData.unit_price),
       min_stock_level: Number(formData.min_stock_level),
       target_stock_level: Number(formData.target_stock_level),
-      current_stock: Number(formData.current_stock)
+      current_stock: Number(formData.current_stock),
+      barcode: formData.barcode || `NEXO-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
     }]);
     if (!error) onSuccess(); else alert(error.message);
     setSubmitting(false);
@@ -359,7 +396,7 @@ function AddItemModal({ companyId, onClose, onSuccess }: { companyId: string | n
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6 text-indigo-900">
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 bg-slate-900/60 backdrop-blur-md" />
-      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative bg-white w-full max-w-lg rounded-[44px] p-12 shadow-2xl z-10">
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative bg-white w-full max-w-lg rounded-[44px] p-12 shadow-2xl z-10 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-8"><h2 className="text-2xl font-black text-slate-800 tracking-tight">새 물품 등록</h2><button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={24} /></button></div>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-4">
@@ -373,8 +410,26 @@ function AddItemModal({ companyId, onClose, onSuccess }: { companyId: string | n
               <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">초기 재고량</label><input type="number" className="w-full p-4 bg-slate-50 rounded-2xl font-bold border-none outline-none" value={formData.current_stock} onChange={e => setFormData({...formData, current_stock: e.target.value})} /></div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">안전 재고량 (부족 알림)</label><input type="number" className="w-full p-4 bg-slate-50 rounded-2xl font-bold border-none outline-none" value={formData.min_stock_level} onChange={e => setFormData({...formData, min_stock_level: e.target.value})} /></div>
-              <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">목표 재고량 (게이지 기준)</label><input type="number" className="w-full p-4 bg-slate-50 rounded-2xl font-bold border-none outline-none" value={formData.target_stock_level} onChange={e => setFormData({...formData, target_stock_level: e.target.value})} /></div>
+              <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">안전 재고량</label><input type="number" className="w-full p-4 bg-slate-50 rounded-2xl font-bold border-none outline-none" value={formData.min_stock_level} onChange={e => setFormData({...formData, min_stock_level: e.target.value})} /></div>
+              <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">목표 재고량</label><input type="number" className="w-full p-4 bg-slate-50 rounded-2xl font-bold border-none outline-none" value={formData.target_stock_level} onChange={e => setFormData({...formData, target_stock_level: e.target.value})} /></div>
+            </div>
+            <div>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">NEXO QR / 바코드</label>
+              <div className="flex gap-2">
+                <input 
+                  className="flex-1 p-4 bg-slate-50 rounded-2xl font-bold border-none outline-none" 
+                  placeholder="미입력 시 자동 생성" 
+                  value={formData.barcode} 
+                  onChange={e => setFormData({...formData, barcode: e.target.value})} 
+                />
+                <button 
+                  type="button"
+                  onClick={() => setFormData({...formData, barcode: `NEXO-${Math.random().toString(36).substr(2, 9).toUpperCase()}`})}
+                  className="px-4 bg-slate-100 text-[10px] font-black rounded-2xl hover:bg-slate-200 transition-all text-slate-600"
+                >
+                  자동 생성
+                </button>
+              </div>
             </div>
           </div>
           <button type="submit" disabled={submitting} className="w-full py-5 bg-indigo-600 text-white font-black rounded-2xl text-xs tracking-widest uppercase shadow-xl shadow-indigo-600/20">{submitting ? '등록 중...' : '물품 등록 완료'}</button>
@@ -392,7 +447,8 @@ function EditItemModal({ item, onClose, onSuccess }: { item: InventoryItem, onCl
     unit_price: item.unit_price.toString(), 
     min_stock_level: item.min_stock_level.toString(),
     current_stock: item.current_stock.toString(),
-    target_stock_level: item.target_stock_level?.toString() || "100"
+    target_stock_level: item.target_stock_level?.toString() || "100",
+    barcode: item.barcode || ""
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -407,7 +463,8 @@ function EditItemModal({ item, onClose, onSuccess }: { item: InventoryItem, onCl
         unit_price: Number(formData.unit_price),
         min_stock_level: Number(formData.min_stock_level),
         target_stock_level: Number(formData.target_stock_level),
-        current_stock: Number(formData.current_stock)
+        current_stock: Number(formData.current_stock),
+        barcode: formData.barcode
       })
       .eq("id", item.id);
     
@@ -418,7 +475,7 @@ function EditItemModal({ item, onClose, onSuccess }: { item: InventoryItem, onCl
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6 text-indigo-900">
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 bg-slate-900/60 backdrop-blur-md" />
-      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative bg-white w-full max-w-lg rounded-[44px] p-12 shadow-2xl z-10">
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative bg-white w-full max-w-lg rounded-[44px] p-12 shadow-2xl z-10 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-8"><h2 className="text-2xl font-black text-slate-800 tracking-tight">물품 정보 수정</h2><button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={24} /></button></div>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-4">
@@ -432,8 +489,26 @@ function EditItemModal({ item, onClose, onSuccess }: { item: InventoryItem, onCl
               <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">현재 재고량</label><input type="number" className="w-full p-4 bg-slate-50 rounded-2xl font-bold border-none outline-none" value={formData.current_stock} onChange={e => setFormData({...formData, current_stock: e.target.value})} /></div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">안전 재고량 (부족 알림)</label><input type="number" className="w-full p-4 bg-slate-50 rounded-2xl font-bold border-none outline-none" value={formData.min_stock_level} onChange={e => setFormData({...formData, min_stock_level: e.target.value})} /></div>
-              <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">목표 재고량 (게이지 기준)</label><input type="number" className="w-full p-4 bg-slate-50 rounded-2xl font-bold border-none outline-none" value={formData.target_stock_level} onChange={e => setFormData({...formData, target_stock_level: e.target.value})} /></div>
+              <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">안전 재고량</label><input type="number" className="w-full p-4 bg-slate-50 rounded-2xl font-bold border-none outline-none" value={formData.min_stock_level} onChange={e => setFormData({...formData, min_stock_level: e.target.value})} /></div>
+              <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">목표 재고량</label><input type="number" className="w-full p-4 bg-slate-50 rounded-2xl font-bold border-none outline-none" value={formData.target_stock_level} onChange={e => setFormData({...formData, target_stock_level: e.target.value})} /></div>
+            </div>
+            <div>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">NEXO QR / 바코드</label>
+              <div className="flex gap-2">
+                <input 
+                  className="flex-1 p-4 bg-slate-50 rounded-2xl font-bold border-none outline-none" 
+                  placeholder="바코드 번호 입력" 
+                  value={formData.barcode} 
+                  onChange={e => setFormData({...formData, barcode: e.target.value})} 
+                />
+                <button 
+                  type="button"
+                  onClick={() => setFormData({...formData, barcode: `NEXO-${Math.random().toString(36).substr(2, 9).toUpperCase()}`})}
+                  className="px-4 bg-slate-100 text-[10px] font-black rounded-2xl hover:bg-slate-200 transition-all text-slate-600"
+                >
+                  새로 생성
+                </button>
+              </div>
             </div>
           </div>
           <button type="submit" disabled={submitting} className="w-full py-5 bg-indigo-600 text-white font-black rounded-2xl text-xs tracking-widest uppercase shadow-xl shadow-indigo-600/20">{submitting ? '저장 중...' : '수정 사항 저장'}</button>
@@ -548,7 +623,7 @@ function HistoryModal({ companyId, onClose }: { companyId: string, onClose: () =
   }, [companyId]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 text-indigo-900">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 text-indigo-900 text-center">
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 bg-slate-900/60 backdrop-blur-md" />
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative bg-white w-full max-w-2xl rounded-[44px] p-12 shadow-2xl z-10 flex flex-col max-h-[80vh] overflow-hidden">
         
@@ -559,7 +634,7 @@ function HistoryModal({ companyId, onClose }: { companyId: string, onClose: () =
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className="flex flex-col h-full"
+              className="flex flex-col h-full text-left"
             >
               <div className="flex justify-between items-center mb-8">
                 <h2 className="text-2xl font-black text-slate-800 tracking-tight">최근 입출고 내역</h2>
@@ -585,7 +660,7 @@ function HistoryModal({ companyId, onClose }: { companyId: string, onClose: () =
                         <div>
                           <p className="font-black text-slate-800">{tx.item?.name || "삭제된 품목"}</p>
                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                            {new Date(tx.created_at).toLocaleString()} · {tx.profile?.full_name || "매니저"} · {tx.reason || "사유 없음"}
+                            {new Date(tx.created_at).toLocaleString()} · {tx.profile?.full_name || "매니저"}
                           </p>
                         </div>
                       </div>
@@ -608,7 +683,7 @@ function HistoryModal({ companyId, onClose }: { companyId: string, onClose: () =
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
-              className="flex flex-col h-full"
+              className="flex flex-col h-full text-left"
             >
               <div className="flex items-center gap-4 mb-10">
                 <button 
@@ -621,7 +696,6 @@ function HistoryModal({ companyId, onClose }: { companyId: string, onClose: () =
               </div>
 
               <div className="flex-1 space-y-8 overflow-y-auto pr-2">
-                {/* Status Banner */}
                 <div className={`p-8 rounded-[38px] flex items-center justify-between ${selectedTx.type === 'in' ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-600/20' : 'bg-rose-600 text-white shadow-xl shadow-rose-600/20'}`}>
                   <div>
                     <p className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-1">Transaction Type</p>
@@ -633,7 +707,6 @@ function HistoryModal({ companyId, onClose }: { companyId: string, onClose: () =
                   </div>
                 </div>
 
-                {/* Item & Processor Info */}
                 <div className="grid grid-cols-2 gap-6">
                   <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">물품명</p>
@@ -647,22 +720,12 @@ function HistoryModal({ companyId, onClose }: { companyId: string, onClose: () =
                   </div>
                 </div>
 
-                {/* Date & Reason */}
                 <div className="space-y-6">
                   <div className="p-6 bg-white border border-slate-100 rounded-3xl">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">거래 일시</p>
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-slate-50 rounded-lg text-slate-400"><History size={16} /></div>
-                      <p className="font-black text-slate-700">
-                        {new Date(selectedTx.created_at).toLocaleString('ko-KR', { 
-                          year: 'numeric', 
-                          month: '2-digit', 
-                          day: '2-digit', 
-                          hour: '2-digit', 
-                          minute: '2-digit',
-                          hour12: true 
-                        })}
-                      </p>
+                      <p className="font-black text-slate-700">{new Date(selectedTx.created_at).toLocaleString()}</p>
                     </div>
                   </div>
                   <div className="p-6 bg-white border border-slate-100 rounded-3xl">
@@ -671,13 +734,6 @@ function HistoryModal({ companyId, onClose }: { companyId: string, onClose: () =
                       "{selectedTx.reason || "기록된 사유가 없습니다."}"
                     </div>
                   </div>
-                </div>
-
-                <div className="p-6 bg-indigo-50 rounded-[32px] border border-indigo-100 flex items-center justify-between">
-                  <div className="flex items-center gap-3 text-indigo-600 font-black uppercase tracking-widest text-[10px]">
-                    <Box size={14} /> Item Valuation
-                  </div>
-                  <p className="font-black text-indigo-900">₩{((selectedTx.item?.unit_price || 0) * selectedTx.quantity).toLocaleString()}</p>
                 </div>
               </div>
             </motion.div>
