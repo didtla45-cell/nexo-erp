@@ -293,7 +293,7 @@ function TrackingModal({ order, onClose }: { order: LogisticsOrder, onClose: () 
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 text-indigo-900">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 text-indigo-900">
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 bg-slate-900/60 backdrop-blur-md" />
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative bg-white w-full max-w-xl rounded-[44px] p-12 shadow-2xl z-10">
         <div className="flex justify-between items-center mb-10">
@@ -357,7 +357,7 @@ function AddWarehouseModal({ companyId, onClose, onSuccess }: { companyId: strin
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 text-indigo-900">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 text-indigo-900">
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 bg-slate-900/60 backdrop-blur-md" />
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative bg-white w-full max-w-lg rounded-[44px] p-12 shadow-2xl z-10">
         <div className="flex justify-between items-center mb-10"><h2 className="text-2xl font-black text-slate-800 tracking-tight">창고 정보 등록</h2><button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={24} /></button></div>
@@ -422,7 +422,7 @@ function TransferStockModal({ companyId, warehouses, onClose, onSuccess }: { com
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 text-indigo-900">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 text-indigo-900">
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 bg-slate-900/60 backdrop-blur-md" />
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative bg-white w-full max-w-lg rounded-[44px] p-12 shadow-2xl z-10">
         <div className="flex justify-between items-center mb-10"><h2 className="text-2xl font-black text-slate-800 tracking-tight">창고 간 재고 이동</h2><button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={24} /></button></div>
