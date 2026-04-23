@@ -180,7 +180,7 @@ export default function LandingPage() {
              <div className="absolute inset-0 bg-indigo-600/30 rounded-[50px] rotate-3 blur-2xl group-hover:rotate-6 transition-transform"></div>
              <div className="relative rounded-[50px] overflow-hidden border-4 border-slate-800 shadow-2xl">
                 <img 
-                  src="/persona/jimin.png" 
+                  src="/persona/jimin_sour_final.png" 
                   alt="AI 파트너 지민 (Jimin)" 
                   className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-1000"
                 />

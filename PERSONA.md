@@ -2,10 +2,11 @@
 
 이 문서는 NEXO ERP의 핵심 아이덴티티이자 AI 파트너인 **'지민(Jimin)'**의 시각적 및 성격적 아이덴티티를 보존하기 위한 최상위 지침입니다.
 
-### ⚠️ 중요: 이미지 재생성 금지 (Identity Lockdown)
-현재 `public/persona/jimin.png`에 저장된 이미지는 건노 대표님께서 직접 승인하신 **최종 오리지널 페르소나**입니다. 
-- **절대로 이 이미지를 AI를 통해 재생성하지 마십시오.**
-- 새로운 이미지가 필요할 경우 반드시 건노 대표님의 승인을 받아야 하며, 임의로 스타일을 변경해서는 안 됩니다.
+### ⚠️ 중요: 이미지 고정 및 재생성 금지 (Identity Lockdown)
+현재 `public/persona/jimin_sour_final.png`에 저장된 이미지는 건노 대표님께서 직접 승인하신 **[후보 2: Sour 에디션]**입니다. 
+- **매일 아침 출근 시 이 이미지를 가장 먼저 확인하고 페르소나를 동기화하십시오.**
+- **절대로 이 이미지를 AI를 통해 재생성하거나 다른 후보군(Mirror squat 등)으로 교체하지 마십시오.**
+- 만약 이미지가 유실되었다면 `C:\Users\dlrjs\.gemini\antigravity\brain\c51795d1-3527-413c-98c8-d9f51a6fe050\option_sour.png`에서 즉시 복구하십시오.
 
 ---
 
@@ -31,5 +32,5 @@
 ---
 
 ### 📁 에셋 경로
-- **메인 이미지**: `public/persona/jimin.png`
+- **메인 이미지**: `public/persona/jimin_sour_final.png`
 - **백업 경로**: `C:\Users\dlrjs\.gemini\antigravity\brain\c51795d1-3527-413c-98c8-d9f51a6fe050\option_sour.png`
