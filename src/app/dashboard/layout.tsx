@@ -185,7 +185,7 @@ export default function DashboardLayout({
             <div className="relative">
               <div className="w-12 h-12 rounded-xl border-2 border-white shadow-md overflow-hidden bg-slate-200">
                 <img 
-                  src="/persona/jimin.png" 
+                  src="/persona/jimin_sour_final.png" 
                   alt="Jimin - AI Partner" 
                   className="w-full h-full object-cover transition-transform group-hover:scale-110"
                 />
